@@ -1,0 +1,1910 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Твои Уроки</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --fg: #111827;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --muted: #6b7280;
+      --danger: #b91c1c;
+      --success: #15803d;
+    }
+    [data-theme="dark"] {
+      --bg: #030712;
+      --fg: #e5e7eb;
+      --accent: #60a5fa;
+      --accent-soft: #1d283a;
+      --card: #020617;
+      --border: #1f2933;
+      --muted: #9ca3af;
+      --danger: #fecaca;
+      --success: #86efac;
+    }
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #e5e7eb 0, var(--bg) 40%, var(--bg) 100%);
+      color: var(--fg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Начальный экран */
+    #startScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .start-logo {
+      width: 100px;
+      height: 100px;
+      border-radius: 28px;
+      background: conic-gradient(from 210deg, #111827, #4b5563, #111827);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f9fafb;
+      font-weight: 800;
+      font-size: 42px;
+      margin-bottom: 32px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .start-title {
+      font-size: 42px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      text-align: center;
+      letter-spacing: -0.02em;
+    }
+    .start-subtitle {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 48px;
+      text-align: center;
+      max-width: 400px;
+      line-height: 1.5;
+    }
+    .start-btn {
+      padding: 20px 56px;
+      font-size: 20px;
+      border-radius: 16px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 12px 40px rgba(37,99,235,0.35);
+      transition: all 0.3s;
+    }
+    .start-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 50px rgba(37,99,235,0.45);
+    }
+
+    /* Скрытая кнопка админа - в левом нижнем углу, очень незаметная */
+    .admin-corner-btn {
+      position: fixed;
+      bottom: 30px;
+      left: 30px;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      opacity: 0.15;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+    }
+    .admin-corner-btn:hover {
+      opacity: 1;
+      background: var(--card);
+      border-color: var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    /* Или вариант с текстом "Для администрации" */
+    .admin-text-link {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      font-size: 13px;
+      color: var(--muted);
+      opacity: 0.3;
+      cursor: pointer;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.3s;
+      border: 1px solid transparent;
+    }
+    .admin-text-link:hover {
+      opacity: 1;
+      background: var(--card);
+      border-color: var(--border);
+    }
+
+    /* Основной layout */
+    .app-container {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+    }
+    
+    /* Боковая навигация (ПК) */
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 280px;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      padding: 28px 20px;
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 48px;
+      padding: 0 12px;
+    }
+    .sidebar-logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: conic-gradient(from 210deg, #111827, #4b5563, #111827);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f9fafb;
+      font-weight: 800;
+      font-size: 22px;
+    }
+    .sidebar-brand-text {
+      font-size: 24px;
+      font-weight: 800;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-radius: 14px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      color: var(--muted);
+      transition: all 0.2s;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .nav-item:hover, .nav-item.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .nav-item.active {
+      font-weight: 600;
+    }
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 20px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      opacity: 0.7;
+    }
+    
+    /* Основной контент */
+    .main-content {
+      margin-left: 280px;
+      flex: 1;
+      padding: 32px 40px;
+      max-width: calc(100% - 280px);
+    }
+    
+    /* Нижняя навигация (мобильная) */
+    .bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 12px 24px 28px;
+      justify-content: space-around;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+    }
+    .bottom-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 16px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .bottom-nav-item.active {
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .bottom-nav-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    /* Тема переключатель */
+    .theme-toggle {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      z-index: 50;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .switch {
+      width: 44px;
+      height: 24px;
+      border-radius: 999px;
+      background: var(--border);
+      position: relative;
+      transition: background 0.2s;
+    }
+    .switch::after {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: var(--card);
+      top: 3px;
+      left: 3px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+    }
+    .switch.on {
+      background: var(--accent);
+    }
+    .switch.on::after {
+      transform: translateX(20px);
+    }
+
+    /* Карточки */
+    .card {
+      background: var(--card);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .card-title {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .card-subtitle {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* Экраны */
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: block;
+    }
+
+    /* Формы */
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--fg);
+      display: block;
+      margin-bottom: 10px;
+    }
+    select, input[type="text"], input[type="password"], input[type="number"] {
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+    select:focus, input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+    .form-group {
+      margin-bottom: 24px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 640px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Кнопки */
+    button {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--fg);
+      padding: 14px 24px;
+      font-size: 15px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+    button:hover {
+      background: var(--bg);
+      transform: translateY(-1px);
+    }
+    button.primary {
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      color: #f9fafb;
+      border-color: transparent;
+      box-shadow: 0 6px 20px rgba(37,99,235,0.3);
+    }
+    button.primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(37,99,235,0.4);
+    }
+    button.danger {
+      background: #fee2e2;
+      color: var(--danger);
+      border-color: transparent;
+    }
+    button.danger:hover {
+      background: #fecaca;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Расписание */
+    .day-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .day-btn {
+      padding: 12px 24px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .day-btn:hover {
+      background: var(--bg);
+      transform: translateY(-1px);
+    }
+    .day-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+      box-shadow: 0 4px 16px rgba(37,99,235,0.3);
+    }
+    .day-btn.sunday {
+      opacity: 0.3;
+      cursor: not-allowed;
+      background: var(--bg);
+    }
+
+    .timetable-grid {
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--card);
+    }
+    .lesson-row {
+      display: grid;
+      grid-template-columns: 70px 1fr 160px 100px 1.2fr;
+      border-bottom: 1px solid var(--border);
+      font-size: 16px;
+      min-height: 80px;
+      align-items: center;
+      transition: background 0.2s;
+    }
+    .lesson-row:hover {
+      background: var(--bg);
+    }
+    .lesson-row:last-child {
+      border-bottom: none;
+    }
+    .lesson-row.header {
+      background: var(--accent-soft);
+      font-weight: 700;
+      min-height: 56px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .lesson-cell {
+      padding: 20px;
+      display: flex;
+      align-items: center;
+    }
+    .lesson-index {
+      justify-content: center;
+      font-weight: 800;
+      color: var(--accent);
+      font-size: 22px;
+    }
+    .lesson-subject {
+      font-weight: 700;
+      font-size: 17px;
+    }
+    .lesson-time {
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .lesson-cabinet {
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .lesson-status {
+      font-size: 14px;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--border);
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .progress-inner {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #22c55e);
+      transition: width 0.4s linear;
+      border-radius: 999px;
+    }
+    .status-text {
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+    .status-time {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* Плашка домашнего обучения */
+    .remote-banner {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border: 2px solid #f59e0b;
+      color: #92400e;
+      padding: 24px 32px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+      font-weight: 700;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.2);
+    }
+    [data-theme="dark"] .remote-banner {
+      background: linear-gradient(135deg, #451a03, #78350f);
+      color: #fcd34d;
+      border-color: #b45309;
+    }
+
+    /* Админ панель */
+    .admin-section {
+      margin-bottom: 40px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-section:last-child {
+      border-bottom: none;
+    }
+    .admin-section-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lessons-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .lesson-editor-row {
+      display: grid;
+      grid-template-columns: 60px 1fr 100px 100px 100px 48px;
+      gap: 12px;
+      align-items: center;
+      padding: 16px;
+      background: var(--bg);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+    .lesson-editor-row input, .lesson-editor-row select {
+      margin: 0;
+      padding: 12px;
+      font-size: 14px;
+    }
+    .delete-lesson-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fee2e2;
+      color: var(--danger);
+      border: none;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .delete-lesson-btn:hover {
+      background: #fecaca;
+      transform: scale(1.05);
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 16px 0;
+      padding: 16px;
+      background: var(--bg);
+      border-radius: 14px;
+      cursor: pointer;
+    }
+    .checkbox-group input[type="checkbox"] {
+      width: 24px;
+      height: 24px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .checkbox-group label {
+      margin: 0;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    /* Калькулятор */
+    .calc-container {
+      background: var(--bg);
+      border-radius: 20px;
+      padding: 28px;
+    }
+    .grade-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--card);
+      border-radius: 16px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+    }
+    .grade-info {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .grade-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--accent);
+      width: 50px;
+      text-align: center;
+    }
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+    .stat-chip {
+      background: var(--card);
+      padding: 16px 24px;
+      border-radius: 16px;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    /* Модальное окно */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal {
+      background: var(--card);
+      border-radius: 28px;
+      padding: 40px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+    }
+    .modal-title {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    /* Адаптивность */
+    @media (max-width: 1024px) {
+      .sidebar {
+        display: none;
+      }
+      .main-content {
+        margin-left: 0;
+        max-width: 100%;
+        padding: 100px 20px 120px;
+      }
+      .bottom-nav {
+        display: flex;
+      }
+      .theme-toggle {
+        top: 20px;
+        right: 20px;
+      }
+      .lesson-row {
+        grid-template-columns: 50px 1fr 120px;
+        gap: 12px;
+      }
+      .lesson-row .lesson-cell:nth-child(4),
+      .lesson-row .lesson-cell:nth-child(5) {
+        grid-column: 2 / 4;
+        padding-top: 0;
+      }
+      .lesson-editor-row {
+        grid-template-columns: 40px 1fr 80px;
+        gap: 10px;
+      }
+      .lesson-editor-row input:nth-child(4),
+      .lesson-editor-row input:nth-child(5) {
+        display: none;
+      }
+      .start-title {
+        font-size: 32px;
+      }
+      .admin-corner-btn {
+        bottom: 20px;
+        left: 20px;
+      }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+    .mt-4 { margin-top: 20px; }
+    .mt-6 { margin-top: 32px; }
+    .mb-4 { margin-bottom: 20px; }
+  </style>
+</head>
+<body data-theme="light">
+  <!-- Начальный экран -->
+  <div id="startScreen">
+    <div class="start-logo">ТУ</div>
+    <div class="start-title">Твои Уроки</div>
+    <div class="start-subtitle">Удобное расписание для учеников 5–11 классов с интеллектуальным трекером уроков</div>
+    <button class="start-btn" onclick="enterAsStudent()">Войти как ученик</button>
+    
+    <!-- СКРЫТАЯ КНОПКА АДМИНА - в левом нижнем углу, почти невидимая -->
+    <button class="admin-corner-btn" onclick="showAdminLogin()" title="Вход для администратора">⚙</button>
+    
+    <!-- Альтернативный вариант - текстовая ссылка справа внизу -->
+    <!-- <div class="admin-text-link" onclick="showAdminLogin()">Для администрации</div> -->
+  </div>
+
+  <!-- Модальное окно входа админа -->
+  <div class="modal-overlay" id="adminLoginModal">
+    <div class="modal">
+      <div class="modal-title">🔐 Вход для администратора</div>
+      <div class="form-group">
+        <label>Логин</label>
+        <input type="text" id="adminLoginInput" placeholder="Введите логин" />
+      </div>
+      <div class="form-group">
+        <label>Пароль</label>
+        <input type="password" id="adminPasswordInput" placeholder="Введите пароль" />
+      </div>
+      <div style="display: flex; gap: 12px; margin-top: 32px;">
+        <button onclick="closeAdminLogin()" style="flex: 1;">Отмена</button>
+        <button class="primary" onclick="loginAdmin()" style="flex: 1;">Войти</button>
+      </div>
+      <p id="adminLoginError" style="color: var(--danger); margin-top: 16px; font-size: 14px; text-align: center;"></p>
+    </div>
+  </div>
+
+  <!-- Основное приложение -->
+  <div class="app-container" id="appContainer">
+    <!-- Боковая навигация (ПК) -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">ТУ</div>
+        <div class="sidebar-brand-text">Твои Уроки</div>
+      </div>
+      <div class="nav-item active" onclick="showScreen('schedule')" data-nav="schedule">
+        <span style="font-size: 20px;">📅</span> Расписание
+      </div>
+      <div class="nav-item" onclick="showScreen('calculator')" data-nav="calculator" id="calcNavItem" style="display: none;">
+        <span style="font-size: 20px;">🧮</span> Калькулятор
+      </div>
+      <div class="nav-item" onclick="showScreen('settings')" data-nav="settings" id="settingsNavItem" style="display: none;">
+        <span style="font-size: 20px;">⚙️</span> Настройки
+      </div>
+      <div class="nav-item" onclick="showScreen('admin')" data-nav="admin" id="adminNavItem" style="display: none;">
+        <span style="font-size: 20px;">🔐</span> Админ-панель
+      </div>
+      <div class="sidebar-footer">
+        FTL Reborn 2025®
+      </div>
+    </nav>
+
+    <!-- Нижняя навигация (мобильная) -->
+    <nav class="bottom-nav" id="bottomNav">
+      <div class="bottom-nav-item active" onclick="showScreen('schedule')" data-nav="schedule">
+        <div class="bottom-nav-icon">📅</div>
+        <span>Расписание</span>
+      </div>
+      <div class="bottom-nav-item" onclick="showScreen('calculator')" data-nav="calculator" id="calcBottomItem" style="display: none;">
+        <div class="bottom-nav-icon">🧮</div>
+        <span>Калькулятор</span>
+      </div>
+      <div class="bottom-nav-item" onclick="showScreen('settings')" data-nav="settings" id="settingsBottomItem" style="display: none;">
+        <div class="bottom-nav-icon">⚙️</div>
+        <span>Настройки</span>
+      </div>
+      <div class="bottom-nav-item" onclick="showScreen('admin')" data-nav="admin" id="adminBottomItem" style="display: none;">
+        <div class="bottom-nav-icon">🔐</div>
+        <span>Админ</span>
+      </div>
+    </nav>
+
+    <!-- Переключатель темы -->
+    <div class="theme-toggle" onclick="toggleTheme()">
+      <span id="themeIcon">🌙</span>
+      <div class="switch" id="themeSwitch"></div>
+    </div>
+
+    <!-- Основной контент -->
+    <main class="main-content">
+      <!-- Экран настроек (выбор класса) -->
+      <div class="screen" id="settingsScreen">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Настройки профиля</div>
+              <div class="card-subtitle">Выберите ваш класс и параметры обучения</div>
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="settingsClass">Класс</label>
+              <select id="settingsClass" onchange="onClassChange()">
+                <option value="">Выберите класс...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="settingsMathGroup">Группа по математике</label>
+              <select id="settingsMathGroup" disabled>
+                <option value="">Сначала выберите класс</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row mt-4">
+            <div class="form-group">
+              <label for="settingsProfile">Профиль обучения</label>
+              <select id="settingsProfile" disabled>
+                <option value="">Без профиля</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="settingsDayView">Режим просмотра</label>
+              <select id="settingsDayView">
+                <option value="today">Показывать на сегодня</option>
+                <option value="tomorrow">Показывать на завтра</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="primary mt-6" onclick="saveStudentSettings()" style="width: 100%;">
+            Сохранить и перейти к расписанию
+          </button>
+        </div>
+      </div>
+
+      <!-- Экран расписания -->
+      <div class="screen active" id="scheduleScreen">
+        <div id="remoteLearningBanner" class="remote-banner hidden">
+          <span style="font-size: 28px;">🏠</span>
+          <span>Ваш класс на домашнем обучении</span>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="scheduleTitle">Расписание</div>
+              <div class="card-subtitle" id="scheduleSubtitle">Выберите класс в настройках</div>
+            </div>
+            <button onclick="showScreen('settings')">Изменить класс</button>
+          </div>
+
+          <div class="day-selector" id="daySelector">
+            <button class="day-btn" onclick="selectDay(1)">Пн</button>
+            <button class="day-btn" onclick="selectDay(2)">Вт</button>
+            <button class="day-btn" onclick="selectDay(3)">Ср</button>
+            <button class="day-btn" onclick="selectDay(4)">Чт</button>
+            <button class="day-btn" onclick="selectDay(5)">Пт</button>
+            <button class="day-btn" onclick="selectDay(6)">Сб</button>
+            <button class="day-btn sunday" disabled title="Воскресенье — выходной">Вс</button>
+          </div>
+
+          <div class="timetable-grid" id="timetableGrid">
+            <div style="padding: 80px; text-align: center; color: var(--muted); font-size: 16px;">
+              <div style="font-size: 48px; margin-bottom: 16px;">📚</div>
+              Выберите класс в настройках, чтобы увидеть расписание
+            </div>
+          </div>
+
+          <div style="margin-top: 28px; display: flex; gap: 16px; flex-wrap: wrap;">
+            <span class="stat-chip">
+              📅 <span id="currentDateDisplay">Сегодня: —</span>
+            </span>
+            <span class="stat-chip">
+              🕐 <span id="currentTimeDisplay">Время: —</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Экран калькулятора -->
+      <div class="screen" id="calculatorScreen">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Калькулятор оценок</div>
+              <div class="card-subtitle">Расчёт среднего балла с учётом веса оценок</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Оценка</label>
+              <input type="number" id="calcGrade" min="1" max="5" value="5" />
+            </div>
+            <div class="form-group">
+              <label>Вес (важность)</label>
+              <input type="number" id="calcWeight" min="1" max="10" value="1" />
+            </div>
+          </div>
+
+          <button class="primary mt-4" onclick="addGrade()" style="width: 100%;">
+            ➕ Добавить оценку
+          </button>
+
+          <div class="calc-container mt-6">
+            <div id="gradesList">
+              <p style="color: var(--muted); text-align: center; padding: 40px;">Нет добавленных оценок</p>
+            </div>
+            
+            <div class="stats-row">
+              <div class="stat-chip">
+                Средний балл: <span class="stat-value" id="avgGrade">—</span>
+              </div>
+              <div class="stat-chip">
+                Оценок: <span class="stat-value" id="gradesCount">0</span>
+              </div>
+              <button onclick="resetGrades()">🗑 Сбросить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Экран администратора -->
+      <div class="screen" id="adminScreen">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🔐 Административная панель</div>
+              <div class="card-subtitle">Управление расписанием, классами и настройками системы</div>
+            </div>
+            <button onclick="logoutAdmin()" class="danger">Выйти</button>
+          </div>
+
+          <!-- Выбор класса для редактирования -->
+          <div class="admin-section">
+            <div class="admin-section-title">👥 Выбор класса</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Класс</label>
+                <select id="adminClassSelect" onchange="onAdminClassChange()"></select>
+              </div>
+              <div class="form-group">
+                <label>Группа математики</label>
+                <select id="adminMathGroupSelect">
+                  <option value="">Без группы</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Профиль обучения</label>
+                <select id="adminProfileSelect">
+                  <option value="">Без профиля</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="checkbox-group mt-4">
+              <input type="checkbox" id="remoteLearningCheck" onchange="toggleRemoteLearning()" />
+              <label for="remoteLearningCheck">
+                🏠 Перевести класс на домашнее обучение
+              </label>
+            </div>
+          </div>
+
+          <!-- Выбор дня -->
+          <div class="admin-section">
+            <div class="admin-section-title">📅 Редактирование расписания</div>
+            <div class="day-selector">
+              <button class="day-btn" onclick="selectAdminDay(1)">Пн</button>
+              <button class="day-btn" onclick="selectAdminDay(2)">Вт</button>
+              <button class="day-btn" onclick="selectAdminDay(3)">Ср</button>
+              <button class="day-btn" onclick="selectAdminDay(4)">Чт</button>
+              <button class="day-btn" onclick="selectAdminDay(5)">Пт</button>
+              <button class="day-btn" onclick="selectAdminDay(6)">Сб</button>
+              <button class="day-btn sunday" disabled title="Воскресенье недоступно">Вс</button>
+            </div>
+          </div>
+
+          <!-- Редактор уроков -->
+          <div class="admin-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+              <div class="admin-section-title" style="margin: 0;">📚 Уроки</div>
+              <div style="display: flex; gap: 10px;">
+                <button onclick="addNewLesson()">➕ Добавить урок</button>
+                <button onclick="clearAllLessons()" class="danger">🗑 Очистить всё</button>
+              </div>
+            </div>
+            
+            <div class="lessons-editor" id="adminLessonsEditor">
+              <p style="color: var(--muted); text-align: center; padding: 60px; font-size: 16px;">
+                Выберите класс и день недели для редактирования
+              </p>
+            </div>
+          </div>
+
+          <!-- Специальные настройки -->
+          <div class="admin-section">
+            <div class="admin-section-title">⚡ Дополнительные настройки</div>
+            
+            <div class="checkbox-group">
+              <input type="checkbox" id="bigBreakLessonCheck" onchange="toggleBigBreakLesson()" />
+              <label for="bigBreakLessonCheck">
+                📖 Урок на большой перемене (12:25–13:15)
+              </label>
+            </div>
+
+            <div class="checkbox-group">
+              <input type="checkbox" id="ninthLessonCheck" onchange="toggleNinthLesson()" />
+              <label for="ninthLessonCheck">
+                9️⃣ Девятый урок
+              </label>
+            </div>
+
+            <div id="ninthLessonTimeSettings" class="form-row hidden mt-4">
+              <div class="form-group">
+                <label>Начало урока</label>
+                <div style="display: flex; gap: 10px;">
+                  <input type="number" id="ninthStartH" min="0" max="23" value="15" style="flex: 1;" />
+                  <span style="display: flex; align-items: center; font-size: 20px; font-weight: 700;">:</span>
+                  <input type="number" id="ninthStartM" min="0" max="59" value="30" style="flex: 1;" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Конец урока</label>
+                <div style="display: flex; gap: 10px;">
+                  <input type="number" id="ninthEndH" min="0" max="23" value="16" style="flex: 1;" />
+                  <span style="display: flex; align-items: center; font-size: 20px; font-weight: 700;">:</span>
+                  <input type="number" id="ninthEndM" min="0" max="59" value="10" style="flex: 1;" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Управление профилями -->
+          <div class="admin-section">
+            <div class="admin-section-title">🏷️ Управление профилями обучения</div>
+            <div class="form-row">
+              <div class="form-group">
+                <input type="text" id="newProfileName" placeholder="Название нового профиля (например: Технологический)" />
+              </div>
+              <div class="form-group">
+                <button onclick="addProfile()" class="primary" style="width: 100%;">➕ Добавить профиль</button>
+              </div>
+            </div>
+            <div id="profilesList" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px;"></div>
+          </div>
+
+          <button class="primary mt-6" onclick="saveAdminTimetable()" style="width: 100%; padding: 18px; font-size: 17px;">
+            💾 Сохранить расписание
+          </button>
+          <p id="adminSaveStatus" style="text-align: center; margin-top: 16px; font-size: 15px; min-height: 24px;"></p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+<script>
+// ============ КОНФИГУРАЦИЯ ============
+const ADMIN_LOGIN = "AdminLS";
+const ADMIN_PASSWORD = "SiglaRex6752";
+const STORAGE_KEYS = {
+  THEME: "tu_theme",
+  STUDENT: "tu_student",
+  GRADES: "tu_grades",
+  TIMETABLES: "tu_timetables",
+  PROFILES: "tu_profiles",
+  REMOTE: "tu_remote"
+};
+
+// ============ ДАННЫЕ ============
+const WEEKDAYS = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
+let PROFILES = ["ФМИ", "ИМ", "ФХ", "ЕН", "СЭ"];
+
+const DEFAULT_TIMES = {
+  weekday: {
+    1: { start: "08:15", end: "08:55" },
+    2: { start: "09:05", end: "09:45" },
+    3: { start: "09:55", end: "10:35" },
+    4: { start: "10:45", end: "11:25" },
+    5: { start: "11:45", end: "12:25" },
+    6: { start: "13:15", end: "13:55" },
+    7: { start: "14:00", end: "14:40" },
+    8: { start: "14:45", end: "15:25" }
+  },
+  saturday: {
+    1: { start: "09:00", end: "09:40" },
+    2: { start: "09:45", end: "10:25" },
+    3: { start: "10:35", end: "11:15" },
+    4: { start: "11:30", end: "12:10" },
+    5: { start: "12:15", end: "12:55" },
+    6: { start: "13:00", end: "13:40" },
+    7: { start: "13:45", end: "14:25" },
+    8: { start: "14:30", end: "15:10" }
+  },
+  bigBreak: { start: "12:25", end: "13:15" },
+  ninthDefault: { start: "15:30", end: "16:10" }
+};
+
+let currentState = {
+  isAdmin: false,
+  studentClass: null,
+  studentGroup: "",
+  studentProfile: "",
+  dayView: "today",
+  currentScreen: "schedule",
+  selectedDay: new Date().getDay() || 1,
+  adminSelectedDay: 1,
+  grades: [],
+  timetables: {},
+  profiles: [...PROFILES],
+  remoteClasses: {}
+};
+
+// ============ ИНИЦИАЛИЗАЦИЯ ============
+document.addEventListener("DOMContentLoaded", () => {
+  loadTheme();
+  loadData();
+  generateClassOptions();
+  updateDateTime();
+  setInterval(updateDateTime, 1000);
+  setInterval(updateLessonProgress, 30000);
+  
+  // Установить текущий день
+  const today = new Date().getDay();
+  if (today !== 0) {
+    selectDay(today);
+    currentState.adminSelectedDay = today;
+  }
+});
+
+// ============ ТЕМА ============
+function loadTheme() {
+  const theme = localStorage.getItem(STORAGE_KEYS.THEME) || "light";
+  document.body.dataset.theme = theme;
+  document.getElementById("themeSwitch").classList.toggle("on", theme === "dark");
+  document.getElementById("themeIcon").textContent = theme === "dark" ? "☀️" : "🌙";
+}
+
+function toggleTheme() {
+  const current = document.body.dataset.theme;
+  const next = current === "light" ? "dark" : "light";
+  document.body.dataset.theme = next;
+  localStorage.setItem(STORAGE_KEYS.THEME, next);
+  document.getElementById("themeSwitch").classList.toggle("on", next === "dark");
+  document.getElementById("themeIcon").textContent = next === "dark" ? "☀️" : "🌙";
+}
+
+// ============ НАВИГАЦИЯ ============
+function enterAsStudent() {
+  document.getElementById("startScreen").style.display = "none";
+  document.getElementById("appContainer").style.display = "flex";
+  
+  if (!currentState.studentClass) {
+    showScreen("settings");
+  } else {
+    showScreen("schedule");
+    renderTimetable();
+  }
+}
+
+function showScreen(screenName) {
+  // Скрыть все экраны
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".nav-item, .bottom-nav-item").forEach(n => n.classList.remove("active"));
+  
+  // Показать нужный
+  document.getElementById(screenName + "Screen").classList.add("active");
+  document.querySelectorAll(`[data-nav="${screenName}"]`).forEach(n => n.classList.add("active"));
+  
+  currentState.currentScreen = screenName;
+  
+  if (screenName === "schedule") {
+    renderTimetable();
+  } else if (screenName === "admin") {
+    initAdminPanel();
+  }
+}
+
+// ============ ГЕНЕРАЦИЯ КЛАССОВ ============
+function generateClassOptions() {
+  const classes = [];
+  for (let grade = 5; grade <= 11; grade++) {
+    if (grade === 9) {
+      classes.push("9А", "9Б", "9В");
+    } else {
+      classes.push(grade + "А", grade + "Б");
+    }
+  }
+  
+  const settingsSelect = document.getElementById("settingsClass");
+  const adminSelect = document.getElementById("adminClassSelect");
+  
+  classes.forEach(c => {
+    settingsSelect.innerHTML += `<option value="${c}">${c}</option>`;
+    adminSelect.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+  
+  // Восстановить сохранённые настройки
+  if (currentState.studentClass) {
+    settingsSelect.value = currentState.studentClass;
+    onClassChange();
+    setTimeout(() => {
+      document.getElementById("settingsMathGroup").value = currentState.studentGroup;
+      document.getElementById("settingsProfile").value = currentState.studentProfile;
+      document.getElementById("settingsDayView").value = currentState.dayView;
+    }, 0);
+  }
+}
+
+function getGradeFromClass(className) {
+  return parseInt(className.match(/\d+/)[0]);
+}
+
+function onClassChange() {
+  const className = document.getElementById("settingsClass").value;
+  const grade = getGradeFromClass(className);
+  const mathGroupSelect = document.getElementById("settingsMathGroup");
+  const profileSelect = document.getElementById("settingsProfile");
+  
+  // Группы математики
+  mathGroupSelect.innerHTML = '<option value="">Без группы</option>';
+  if (grade >= 7 && grade <= 11) {
+    mathGroupSelect.disabled = false;
+    const groups = grade === 9 ? 3 : 2;
+    for (let i = 1; i <= groups; i++) {
+      mathGroupSelect.innerHTML += `<option value="${i}">Группа ${i}</option>`;
+    }
+  } else {
+    mathGroupSelect.disabled = true;
+  }
+  
+  // Профили
+  profileSelect.innerHTML = '<option value="">Без профиля</option>';
+  if (grade >= 9 && grade <= 11) {
+    profileSelect.disabled = false;
+    currentState.profiles.forEach(p => {
+      profileSelect.innerHTML += `<option value="${p}">${p}</option>`;
+    });
+  } else {
+    profileSelect.disabled = true;
+  }
+}
+
+function saveStudentSettings() {
+  const className = document.getElementById("settingsClass").value;
+  if (!className) {
+    alert("Пожалуйста, выберите класс");
+    return;
+  }
+  
+  currentState.studentClass = className;
+  currentState.studentGroup = document.getElementById("settingsMathGroup").value;
+  currentState.studentProfile = document.getElementById("settingsProfile").value;
+  currentState.dayView = document.getElementById("settingsDayView").value;
+  
+  localStorage.setItem(STORAGE_KEYS.STUDENT, JSON.stringify({
+    class: currentState.studentClass,
+    group: currentState.studentGroup,
+    profile: currentState.studentProfile,
+    dayView: currentState.dayView
+  }));
+  
+  // Показать скрытые пункты меню
+  document.getElementById("calcNavItem").style.display = "flex";
+  document.getElementById("settingsNavItem").style.display = "flex";
+  document.getElementById("calcBottomItem").style.display = "flex";
+  document.getElementById("settingsBottomItem").style.display = "flex";
+  
+  showScreen("schedule");
+  renderTimetable();
+}
+
+// ============ РАСПИСАНИЕ ============
+function selectDay(day) {
+  if (day === 0) return; // Воскресенье недоступно
+  
+  currentState.selectedDay = day;
+  document.querySelectorAll("#daySelector .day-btn").forEach((btn, i) => {
+    btn.classList.toggle("active", i + 1 === day);
+  });
+  
+  renderTimetable();
+}
+
+function getTargetDate() {
+  const now = new Date();
+  if (currentState.dayView === "tomorrow") {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
+  }
+  return now;
+}
+
+function renderTimetable() {
+  if (!currentState.studentClass) {
+    document.getElementById("timetableGrid").innerHTML = `
+      <div style="padding: 80px; text-align: center; color: var(--muted); font-size: 16px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">📚</div>
+        Выберите класс в настройках, чтобы увидеть расписание
+      </div>
+    `;
+    return;
+  }
+  
+  // Проверка домашнего обучения
+  const isRemote = currentState.remoteClasses[currentState.studentClass];
+  const banner = document.getElementById("remoteLearningBanner");
+  if (isRemote) {
+    banner.classList.remove("hidden");
+    document.getElementById("timetableGrid").innerHTML = "";
+    return;
+  } else {
+    banner.classList.add("hidden");
+  }
+  
+  const targetDate = getTargetDate();
+  const dayOfWeek = currentState.selectedDay || targetDate.getDay() || 1;
+  const isSaturday = dayOfWeek === 6;
+  
+  // Заголовок
+  let title = currentState.studentClass;
+  if (currentState.studentGroup) title += ` • Матем. группа ${currentState.studentGroup}`;
+  if (currentState.studentProfile) title += ` • ${currentState.studentProfile}`;
+  
+  document.getElementById("scheduleTitle").textContent = `Расписание на ${WEEKDAYS[dayOfWeek]}`;
+  document.getElementById("scheduleSubtitle").textContent = title;
+  
+  // Получить расписание
+  const key = `${currentState.studentClass}|${currentState.studentGroup}|${currentState.studentProfile}|${dayOfWeek}`;
+  const timetable = currentState.timetables[key] || { lessons: [] };
+  
+  // Генерация сетки
+  let html = `
+    <div class="lesson-row header">
+      <div class="lesson-cell lesson-index">№</div>
+      <div class="lesson-cell">Предмет</div>
+      <div class="lesson-cell">Время</div>
+      <div class="lesson-cell">Каб.</div>
+      <div class="lesson-cell">Статус</div>
+    </div>
+  `;
+  
+  if (timetable.lessons.length === 0) {
+    html += `
+      <div class="lesson-row">
+        <div class="lesson-cell" style="grid-column: 1/-1; justify-content: center; color: var(--muted); padding: 60px; font-size: 16px;">
+          📭 Расписание для этого дня не заполнено администратором
+        </div>
+      </div>
+    `;
+  } else {
+    const timeConfig = isSaturday ? DEFAULT_TIMES.saturday : DEFAULT_TIMES.weekday;
+    
+    timetable.lessons.forEach((lesson, idx) => {
+      const time = lesson.time || timeConfig[lesson.number] || { start: "--:--", end: "--:--" };
+      const isCurrent = isCurrentLesson(time, dayOfWeek);
+      
+      html += `
+        <div class="lesson-row ${isCurrent ? 'active' : ''}" data-lesson="${idx}" style="${isCurrent ? 'background: var(--accent-soft);' : ''}">
+          <div class="lesson-cell lesson-index">${lesson.number}</div>
+          <div class="lesson-cell lesson-subject">${lesson.subject}</div>
+          <div class="lesson-cell lesson-time">${time.start}–${time.end}</div>
+          <div class="lesson-cell">
+            <span class="lesson-cabinet">${lesson.cabinet || "-"}</span>
+          </div>
+          <div class="lesson-cell">
+            <div class="lesson-status">
+              <div class="status-text" id="status-${idx}">Загрузка...</div>
+              <div class="progress-bar">
+                <div class="progress-inner" id="progress-${idx}"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+  }
+  
+  document.getElementById("timetableGrid").innerHTML = html;
+  updateLessonProgress();
+}
+
+function isCurrentLesson(time, dayOfWeek) {
+  const now = new Date();
+  if (now.getDay() !== dayOfWeek) return false;
+  
+  const [startH, startM] = time.start.split(":").map(Number);
+  const [endH, endM] = time.end.split(":").map(Number);
+  const current = now.getHours() * 60 + now.getMinutes();
+  const start = startH * 60 + startM;
+  const end = endH * 60 + endM;
+  
+  return current >= start && current <= end;
+}
+
+function updateLessonProgress() {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  
+  document.querySelectorAll("[data-lesson]").forEach(row => {
+    const idx = row.dataset.lesson;
+    const timeText = row.querySelector(".lesson-time").textContent;
+    const [start, end] = timeText.split("–");
+    const [startH, startM] = start.split(":").map(Number);
+    const [endH, endM] = end.split(":").map(Number);
+    
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    const total = endMinutes - startMinutes;
+    
+    const statusEl = document.getElementById(`status-${idx}`);
+    const progressEl = document.getElementById(`progress-${idx}`);
+    
+    if (currentMinutes < startMinutes) {
+      const minsToStart = startMinutes - currentMinutes;
+      statusEl.textContent = `⏳ Начало через ${minsToStart} мин`;
+      statusEl.style.color = "var(--muted)";
+      progressEl.style.width = "0%";
+    } else if (currentMinutes > endMinutes) {
+      statusEl.textContent = "✓ Завершён";
+      statusEl.style.color = "var(--success)";
+      progressEl.style.width = "100%";
+    } else {
+      const passed = currentMinutes - startMinutes;
+      const percent = (passed / total) * 100;
+      const minsLeft = endMinutes - currentMinutes;
+      statusEl.textContent = `▶ Осталось ${minsLeft} мин`;
+      statusEl.style.color = "var(--accent)";
+      progressEl.style.width = percent + "%";
+    }
+  });
+}
+
+function updateDateTime() {
+  const now = new Date();
+  const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  document.getElementById("currentDateDisplay").textContent = now.toLocaleDateString("ru-RU", options);
+  document.getElementById("currentTimeDisplay").textContent = now.toLocaleTimeString("ru-RU", {hour: '2-digit', minute:'2-digit'});
+}
+
+// ============ КАЛЬКУЛЯТОР ============
+function addGrade() {
+  const value = parseFloat(document.getElementById("calcGrade").value);
+  const weight = parseFloat(document.getElementById("calcWeight").value);
+  
+  if (isNaN(value) || isNaN(weight) || value < 1 || value > 5) {
+    alert("Оценка должна быть от 1 до 5");
+    return;
+  }
+  
+  currentState.grades.push({ value, weight });
+  saveGrades();
+  renderGrades();
+}
+
+function renderGrades() {
+  const list = document.getElementById("gradesList");
+  if (currentState.grades.length === 0) {
+    list.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 40px;">Нет добавленных оценок</p>';
+  } else {
+    list.innerHTML = currentState.grades.map((g, i) => `
+      <div class="grade-item">
+        <div class="grade-info">
+          <div class="grade-value">${g.value}</div>
+          <div>
+            <div style="font-weight: 700; font-size: 16px;">Оценка #${i + 1}</div>
+            <div style="font-size: 14px; color: var(--muted);">Вес: ${g.weight}</div>
+          </div>
+        </div>
+        <button onclick="removeGrade(${i})" class="delete-lesson-btn">×</button>
+      </div>
+    `).join("");
+  }
+  
+  // Средний балл
+  const totalWeight = currentState.grades.reduce((sum, g) => sum + g.weight, 0);
+  const weightedSum = currentState.grades.reduce((sum, g) => sum + g.value * g.weight, 0);
+  const avg = totalWeight > 0 ? (weightedSum / totalWeight).toFixed(2) : "—";
+  
+  document.getElementById("avgGrade").textContent = avg;
+  document.getElementById("gradesCount").textContent = currentState.grades.length;
+}
+
+function removeGrade(index) {
+  currentState.grades.splice(index, 1);
+  saveGrades();
+  renderGrades();
+}
+
+function resetGrades() {
+  if (confirm("Очистить все оценки?")) {
+    currentState.grades = [];
+    saveGrades();
+    renderGrades();
+  }
+}
+
+function saveGrades() {
+  localStorage.setItem(STORAGE_KEYS.GRADES, JSON.stringify(currentState.grades));
+}
+
+// ============ АДМИНИСТРАТОР ============
+function showAdminLogin() {
+  document.getElementById("adminLoginModal").classList.add("active");
+}
+
+function closeAdminLogin() {
+  document.getElementById("adminLoginModal").classList.remove("active");
+  document.getElementById("adminLoginError").textContent = "";
+}
+
+function loginAdmin() {
+  const login = document.getElementById("adminLoginInput").value;
+  const password = document.getElementById("adminPasswordInput").value;
+  
+  if (login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+    currentState.isAdmin = true;
+    closeAdminLogin();
+    document.getElementById("startScreen").style.display = "none";
+    document.getElementById("appContainer").style.display = "flex";
+    document.getElementById("adminNavItem").style.display = "flex";
+    document.getElementById("adminBottomItem").style.display = "flex";
+    showScreen("admin");
+  } else {
+    document.getElementById("adminLoginError").textContent = "❌ Неверный логин или пароль";
+  }
+}
+
+function logoutAdmin() {
+  currentState.isAdmin = false;
+  document.getElementById("adminNavItem").style.display = "none";
+  document.getElementById("adminBottomItem").style.display = "none";
+  showScreen("schedule");
+}
+
+function initAdminPanel() {
+  renderProfilesList();
+  onAdminClassChange();
+  renderAdminLessons();
+}
+
+function onAdminClassChange() {
+  const className = document.getElementById("adminClassSelect").value;
+  const grade = className ? getGradeFromClass(className) : 0;
+  
+  // Группы математики
+  const mathSelect = document.getElementById("adminMathGroupSelect");
+  mathSelect.innerHTML = '<option value="">Без группы</option>';
+  if (grade >= 7 && grade <= 11) {
+    const groups = grade === 9 ? 3 : 2;
+    for (let i = 1; i <= groups; i++) {
+      mathSelect.innerHTML += `<option value="${i}">Группа ${i}</option>`;
+    }
+  }
+  
+  // Профили
+  const profileSelect = document.getElementById("adminProfileSelect");
+  profileSelect.innerHTML = '<option value="">Без профиля</option>';
+  if (grade >= 9 && grade <= 11) {
+    currentState.profiles.forEach(p => {
+      profileSelect.innerHTML += `<option value="${p}">${p}</option>`;
+    });
+  }
+  
+  // Проверка домашнего обучения
+  document.getElementById("remoteLearningCheck").checked = !!currentState.remoteClasses[className];
+  
+  renderAdminLessons();
+}
+
+function selectAdminDay(day) {
+  if (day === 0) return;
+  currentState.adminSelectedDay = day;
+  document.querySelectorAll("#adminScreen .day-btn").forEach((btn, i) => {
+    btn.classList.toggle("active", i + 1 === day);
+  });
+  renderAdminLessons();
+}
+
+function renderAdminLessons() {
+  const className = document.getElementById("adminClassSelect").value;
+  const container = document.getElementById("adminLessonsEditor");
+  
+  if (!className) {
+    container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 60px; font-size: 16px;">Выберите класс</p>';
+    return;
+  }
+  
+  const group = document.getElementById("adminMathGroupSelect").value;
+  const profile = document.getElementById("adminProfileSelect").value;
+  const day = currentState.adminSelectedDay;
+  const isSaturday = day === 6;
+  
+  const key = `${className}|${group}|${profile}|${day}`;
+  const timetable = currentState.timetables[key] || { lessons: [] };
+  
+  // Загрузить специальные настройки
+  document.getElementById("bigBreakLessonCheck").checked = timetable.hasBigBreakLesson || false;
+  document.getElementById("ninthLessonCheck").checked = timetable.hasNinthLesson || false;
+  document.getElementById("ninthLessonTimeSettings").classList.toggle("hidden", !timetable.hasNinthLesson);
+  
+  if (timetable.ninthTime) {
+    const [startH, startM] = timetable.ninthTime.start.split(":");
+    const [endH, endM] = timetable.ninthTime.end.split(":");
+    document.getElementById("ninthStartH").value = startH;
+    document.getElementById("ninthStartM").value = startM;
+    document.getElementById("ninthEndH").value = endH;
+    document.getElementById("ninthEndM").value = endM;
+  }
+  
+  if (timetable.lessons.length === 0) {
+    // Автозаполнение по умолчанию
+    const timeConfig = isSaturday ? DEFAULT_TIMES.saturday : DEFAULT_TIMES.weekday;
+    for (let i = 1; i <= 8; i++) {
+      timetable.lessons.push({
+        number: i,
+        subject: "",
+        cabinet: "",
+        time: timeConfig[i]
+      });
+    }
+  }
+  
+  container.innerHTML = timetable.lessons.map((lesson, idx) => `
+    <div class="lesson-editor-row">
+      <div style="font-weight: 800; color: var(--accent); font-size: 18px;">${lesson.number}</div>
+      <input type="text" placeholder="Название предмета" value="${lesson.subject}" id="lesson-subj-${idx}" />
+      <select id="lesson-cab-${idx}">
+        <option value="">Каб.</option>
+        ${generateCabinetOptions(lesson.cabinet)}
+      </select>
+      <input type="text" placeholder="08:00" value="${lesson.time?.start || ''}" id="lesson-start-${idx}" />
+      <input type="text" placeholder="08:45" value="${lesson.time?.end || ''}" id="lesson-end-${idx}" />
+      <button class="delete-lesson-btn" onclick="removeAdminLesson(${idx})">×</button>
+    </div>
+  `).join("");
+}
+
+function generateCabinetOptions(selected) {
+  let html = "";
+  for (let i = 1; i <= 23; i++) {
+    html += `<option value="${i}" ${selected == i ? "selected" : ""}>${i}</option>`;
+  }
+  return html;
+}
+
+function addNewLesson() {
+  const container = document.getElementById("adminLessonsEditor");
+  const rows = container.querySelectorAll(".lesson-editor-row");
+  const nextNum = rows.length + 1;
+  
+  const newRow = document.createElement("div");
+  newRow.className = "lesson-editor-row";
+  newRow.innerHTML = `
+    <div style="font-weight: 800; color: var(--accent); font-size: 18px;">${nextNum}</div>
+    <input type="text" placeholder="Название предмета" id="lesson-subj-${rows.length}" />
+    <select id="lesson-cab-${rows.length}">
+      <option value="">Каб.</option>
+      ${generateCabinetOptions("")}
+    </select>
+    <input type="text" placeholder="15:30" value="15:30" id="lesson-start-${rows.length}" />
+    <input type="text" placeholder="16:10" value="16:10" id="lesson-end-${rows.length}" />
+    <button class="delete-lesson-btn" onclick="removeAdminLesson(${rows.length})">×</button>
+  `;
+  container.appendChild(newRow);
+}
+
+function removeAdminLesson(idx) {
+  const container = document.getElementById("adminLessonsEditor");
+  const rows = container.querySelectorAll(".lesson-editor-row");
+  if (rows[idx]) {
+    rows[idx].remove();
+    // Перенумеровать
+    container.querySelectorAll(".lesson-editor-row").forEach((row, i) => {
+      row.querySelector("div").textContent = i + 1;
+    });
+  }
+}
+
+function clearAllLessons() {
+  if (confirm("🗑 Удалить все уроки для этого дня?")) {
+    document.getElementById("adminLessonsEditor").innerHTML = "";
+  }
+}
+
+function toggleBigBreakLesson() {
+  // Логика сохраняется при сохранении расписания
+}
+
+function toggleNinthLesson() {
+  const checked = document.getElementById("ninthLessonCheck").checked;
+  document.getElementById("ninthLessonTimeSettings").classList.toggle("hidden", !checked);
+}
+
+function toggleRemoteLearning() {
+  const className = document.getElementById("adminClassSelect").value;
+  if (document.getElementById("remoteLearningCheck").checked) {
+    currentState.remoteClasses[className] = true;
+  } else {
+    delete currentState.remoteClasses[className];
+  }
+  localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(currentState.remoteClasses));
+}
+
+function renderProfilesList() {
+  const container = document.getElementById("profilesList");
+  container.innerHTML = currentState.profiles.map((p, i) => `
+    <span style="background: var(--accent-soft); color: var(--accent); padding: 10px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border);">
+      ${p}
+      <button onclick="removeProfile(${i})" style="background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 20px; line-height: 1; opacity: 0.6;">×</button>
+    </span>
+  `).join("");
+}
+
+function addProfile() {
+  const name = document.getElementById("newProfileName").value.trim();
+  if (name && !currentState.profiles.includes(name)) {
+    currentState.profiles.push(name);
+    localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentState.profiles));
+    document.getElementById("newProfileName").value = "";
+    renderProfilesList();
+    onAdminClassChange();
+  } else if (currentState.profiles.includes(name)) {
+    alert("Такой профиль уже существует");
+  }
+}
+
+function removeProfile(idx) {
+  if (confirm(`Удалить профиль "${currentState.profiles[idx]}"?`)) {
+    currentState.profiles.splice(idx, 1);
+    localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentState.profiles));
+    renderProfilesList();
+    onAdminClassChange();
+  }
+}
+
+function saveAdminTimetable() {
+  const className = document.getElementById("adminClassSelect").value;
+  if (!className) {
+    alert("Выберите класс");
+    return;
+  }
+  
+  const group = document.getElementById("adminMathGroupSelect").value;
+  const profile = document.getElementById("adminProfileSelect").value;
+  const day = currentState.adminSelectedDay;
+  
+  const lessons = [];
+  const rows = document.querySelectorAll("#adminLessonsEditor .lesson-editor-row");
+  
+  rows.forEach((row, idx) => {
+    const subject = row.querySelector(`#lesson-subj-${idx}`)?.value?.trim() || "";
+    if (!subject) return;
+    
+    const cabinet = row.querySelector(`#lesson-cab-${idx}`)?.value || "";
+    const start = row.querySelector(`#lesson-start-${idx}`)?.value || "";
+    const end = row.querySelector(`#lesson-end-${idx}`)?.value || "";
+    
+    lessons.push({
+      number: idx + 1,
+      subject,
+      cabinet,
+      time: { start, end }
+    });
+  });
+  
+  const key = `${className}|${group}|${profile}|${day}`;
+  currentState.timetables[key] = {
+    lessons,
+    hasBigBreakLesson: document.getElementById("bigBreakLessonCheck").checked,
+    hasNinthLesson: document.getElementById("ninthLessonCheck").checked,
+    ninthTime: document.getElementById("ninthLessonCheck").checked ? {
+      start: `${document.getElementById("ninthStartH").value}:${String(document.getElementById("ninthStartM").value).padStart(2, "0")}`,
+      end: `${document.getElementById("ninthEndH").value}:${String(document.getElementById("ninthEndM").value).padStart(2, "0")}`
+    } : null
+  };
+  
+  localStorage.setItem(STORAGE_KEYS.TIMETABLES, JSON.stringify(currentState.timetables));
+  
+  const status = document.getElementById("adminSaveStatus");
+  status.innerHTML = "✅ <b>Расписание успешно сохранено!</b>";
+  status.style.color = "var(--success)";
+  setTimeout(() => status.innerHTML = "", 4000);
+}
+
+// ============ ЗАГРУЗКА/СОХРАНЕНИЕ ============
+function loadData() {
+  // Студент
+  const student = localStorage.getItem(STORAGE_KEYS.STUDENT);
+  if (student) {
+    const s = JSON.parse(student);
+    currentState.studentClass = s.class;
+    currentState.studentGroup = s.group;
+    currentState.studentProfile = s.profile;
+    currentState.dayView = s.dayView || "today";
+    
+    // Показать меню
+    document.getElementById("calcNavItem").style.display = "flex";
+    document.getElementById("settingsNavItem").style.display = "flex";
+    document.getElementById("calcBottomItem").style.display = "flex";
+    document.getElementById("settingsBottomItem").style.display = "flex";
+  }
+  
+  // Оценки
+  const grades = localStorage.getItem(STORAGE_KEYS.GRADES);
+  if (grades) currentState.grades = JSON.parse(grades);
+  
+  // Расписания
+  const timetables = localStorage.getItem(STORAGE_KEYS.TIMETABLES);
+  if (timetables) currentState.timetables = JSON.parse(timetables);
+  
+  // Профили
+  const profiles = localStorage.getItem(STORAGE_KEYS.PROFILES);
+  if (profiles) {
+    currentState.profiles = JSON.parse(profiles);
+    PROFILES = currentState.profiles;
+  }
+  
+  // Домашнее обучение
+  const remote = localStorage.getItem(STORAGE_KEYS.REMOTE);
+  if (remote) currentState.remoteClasses = JSON.parse(remote);
+}
+</script>
+</body>
+</html>
