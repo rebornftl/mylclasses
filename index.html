@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <title>Твои Уроки</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
   <style>
     :root {
       --bg: #f3f4f6;
@@ -839,7 +841,7 @@
         <span style="font-size: 20px;">🔐</span> Админ-панель
       </div>
       <div class="sidebar-footer">
-        FTL Reborn 2025®
+        FTL Reborn 2026®
       </div>
     </nav>
 
@@ -1138,8 +1140,12 @@
     </main>
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// ============ SUPABASE КОНФИГУРАЦИЯ ============
+const SUPABASE_URL = "https://vcdwobqhbbxodjjmwyex.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjZHdvYnFoYmJ4b2Rqam13eWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjg0MDIsImV4cCI6MjA4OTc0NDQwMn0.6V1JvPLIiEop73Dina2p9hljkWfdYWMbAizzPd1IqQ8";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 // ============ КОНФИГУРАЦИЯ ============
 const ADMIN_LOGIN = "AdminLS";
 const ADMIN_PASSWORD = "SiglaRex6752";
@@ -1151,54 +1157,6 @@ const STORAGE_KEYS = {
   PROFILES: "tu_profiles",
   REMOTE: "tu_remote"
 };
-
-// Supabase settings (подставьте свои значения)
-const SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
-const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
-
-function isSupabaseEnabled() {
-  return !!supabase;
-}
-
-async function loadSupabaseTimetables() {
-  if (!isSupabaseEnabled()) return;
-
-  const { data, error } = await supabase
-    .from("timetables")
-    .select("key, payload")
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    console.warn("Supabase load error:", error.message);
-    return;
-  }
-
-  data?.forEach(row => {
-    if (row.key && row.payload) {
-      currentState.timetables[row.key] = row.payload;
-    }
-  });
-}
-
-async function saveSupabaseTimetable(key, payload) {
-  if (!isSupabaseEnabled()) return;
-
-  const { error } = await supabase
-    .from("timetables")
-    .upsert({ key, payload, updated_at: new Date().toISOString() }, { onConflict: "key" });
-
-  if (error) {
-    console.warn("Supabase save error:", error.message);
-  }
-}
-
-async function syncTimetableKey(key) {
-  const timetable = currentState.timetables[key];
-  if (!timetable) return;
-
-  await saveSupabaseTimetable(key, timetable);
-}
 
 // ============ ДАННЫЕ ============
 const WEEKDAYS = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
@@ -1245,9 +1203,9 @@ let currentState = {
 };
 
 // ============ ИНИЦИАЛИЗАЦИЯ ============
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   loadTheme();
-  loadData();
+  await loadDataFromSupabase();
   generateClassOptions();
   updateDateTime();
   setInterval(updateDateTime, 1000);
@@ -1830,10 +1788,13 @@ function toggleRemoteLearning() {
   const className = document.getElementById("adminClassSelect").value;
   if (document.getElementById("remoteLearningCheck").checked) {
     currentState.remoteClasses[className] = true;
+    localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(currentState.remoteClasses));
+    saveRemoteClassToSupabase(className);
   } else {
     delete currentState.remoteClasses[className];
+    localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(currentState.remoteClasses));
+    removeRemoteClassFromSupabase(className);
   }
-  localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(currentState.remoteClasses));
 }
 
 function renderProfilesList() {
@@ -1854,6 +1815,9 @@ function addProfile() {
     document.getElementById("newProfileName").value = "";
     renderProfilesList();
     onAdminClassChange();
+    
+    // Сохранить в Supabase
+    saveProfileToSupabase(name);
   } else if (currentState.profiles.includes(name)) {
     alert("Такой профиль уже существует");
   }
@@ -1861,10 +1825,14 @@ function addProfile() {
 
 function removeProfile(idx) {
   if (confirm(`Удалить профиль "${currentState.profiles[idx]}"?`)) {
+    const profileName = currentState.profiles[idx];
     currentState.profiles.splice(idx, 1);
     localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentState.profiles));
     renderProfilesList();
     onAdminClassChange();
+    
+    // Удалить из Supabase
+    deleteProfileFromSupabase(profileName);
   }
 }
 
@@ -1910,30 +1878,118 @@ function saveAdminTimetable() {
   };
   
   localStorage.setItem(STORAGE_KEYS.TIMETABLES, JSON.stringify(currentState.timetables));
-
-  if (isSupabaseEnabled()) {
-    syncTimetableKey(key).then(() => {
-      const status = document.getElementById("adminSaveStatus");
-      status.innerHTML = "✅ <b>Расписание сохранено в Supabase!</b>";
-      status.style.color = "var(--success)";
-      setTimeout(() => status.innerHTML = "", 4000);
-    }).catch(err => {
-      console.warn("Supabase save error:", err);
-      const status = document.getElementById("adminSaveStatus");
-      status.innerHTML = "⚠️ Локально сохранено, но не удалось отправить в Supabase.";
-      status.style.color = "var(--danger)";
-      setTimeout(() => status.innerHTML = "", 5000);
-    });
-  } else {
-    const status = document.getElementById("adminSaveStatus");
-    status.innerHTML = "✅ <b>Расписание успешно сохранено!</b>";
-    status.style.color = "var(--success)";
-    setTimeout(() => status.innerHTML = "", 4000);
-  }
+  
+  // Сохранить в Supabase
+  saveToSupabase(key, currentState.timetables[key]);
+  
+  const status = document.getElementById("adminSaveStatus");
+  status.innerHTML = "✅ <b>Расписание успешно сохранено!</b>";
+  status.style.color = "var(--success)";
+  setTimeout(() => status.innerHTML = "", 4000);
 }
 
 // ============ ЗАГРУЗКА/СОХРАНЕНИЕ ============
-function loadData() {
+async function loadDataFromSupabase() {
+  if (!supabase) {
+    console.log("Supabase не инициализирован");
+    loadDataFromLocalStorage();
+    return;
+  }
+  
+  // Загрузить расписание из Supabase
+  try {
+    const { data, error } = await supabase
+      .from('timetables')
+      .select('*');
+    
+    if (error) {
+      console.log("Ошибка загрузки расписания из Supabase:", error);
+      loadDataFromLocalStorage();
+      return;
+    }
+    
+    if (data && data.length > 0) {
+      data.forEach(item => {
+        currentState.timetables[item.key] = item.data;
+      });
+      localStorage.setItem(STORAGE_KEYS.TIMETABLES, JSON.stringify(currentState.timetables));
+      console.log("✅ Расписание загружено из Supabase");
+    }
+  } catch (err) {
+    console.log("Ошибка подключения к Supabase расписания:", err);
+    loadDataFromLocalStorage();
+    return;
+  }
+  
+  // Загрузить профили
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*');
+    
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      currentState.profiles = data.map(p => p.name);
+      PROFILES = currentState.profiles;
+      localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentState.profiles));
+      console.log("✅ Профили загружены из Supabase");
+    }
+  } catch (err) {
+    console.log("Ошибка загрузки профилей:", err);
+    // Используем локальные профили
+    const profiles = localStorage.getItem(STORAGE_KEYS.PROFILES);
+    if (profiles) {
+      currentState.profiles = JSON.parse(profiles);
+      PROFILES = currentState.profiles;
+    }
+  }
+  
+  // Загрузить конфигурацию домашнего обучения
+  try {
+    const { data, error } = await supabase
+      .from('remote_classes')
+      .select('class_name');
+    
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      const remoteData = {};
+      data.forEach(item => {
+        remoteData[item.class_name] = true;
+      });
+      currentState.remoteClasses = remoteData;
+      localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(currentState.remoteClasses));
+      console.log("✅ Данные домашнего обучения загружены из Supabase");
+    }
+  } catch (err) {
+    console.log("Ошибка загрузки данных домашнего обучения:", err);
+    const remote = localStorage.getItem(STORAGE_KEYS.REMOTE);
+    if (remote) currentState.remoteClasses = JSON.parse(remote);
+  }
+  
+  // Загрузить студенческие данные из локального хранилища (они не хранятся в облаке)
+  const student = localStorage.getItem(STORAGE_KEYS.STUDENT);
+  if (student) {
+    const s = JSON.parse(student);
+    currentState.studentClass = s.class;
+    currentState.studentGroup = s.group;
+    currentState.studentProfile = s.profile;
+    currentState.dayView = s.dayView || "today";
+    
+    // Показать меню
+    document.getElementById("calcNavItem").style.display = "flex";
+    document.getElementById("settingsNavItem").style.display = "flex";
+    document.getElementById("calcBottomItem").style.display = "flex";
+    document.getElementById("settingsBottomItem").style.display = "flex";
+  }
+  
+  // Оценки загружаются из локального хранилища
+  const grades = localStorage.getItem(STORAGE_KEYS.GRADES);
+  if (grades) currentState.grades = JSON.parse(grades);
+}
+
+function loadDataFromLocalStorage() {
   // Студент
   const student = localStorage.getItem(STORAGE_KEYS.STUDENT);
   if (student) {
@@ -1968,16 +2024,106 @@ function loadData() {
   // Домашнее обучение
   const remote = localStorage.getItem(STORAGE_KEYS.REMOTE);
   if (remote) currentState.remoteClasses = JSON.parse(remote);
+}
 
-  if (isSupabaseEnabled()) {
-    loadSupabaseTimetables().then(() => {
-      // обновить расписание, если уже выбран класс
-      if (currentState.studentClass) {
-        generateClassOptions();
-        renderTimetable();
-      }
-    }).catch(err => console.warn("Supabase sync error:", err));
+async function saveToSupabase(key, data) {
+  if (!supabase) return console.log("Supabase не инициализирован");
+  
+  try {
+    // Проверить, существует ли уже эта запись
+    const { data: existing, error: checkError } = await supabase
+      .from('timetables')
+      .select('id')
+      .eq('key', key)
+      .maybeSingle();
+    
+    if (existing) {
+      // Обновить существующую запись
+      const { error: updateError } = await supabase
+        .from('timetables')
+        .update({ data })
+        .eq('key', key);
+      
+      if (updateError) throw updateError;
+    } else {
+      // Вставить новую запись
+      const { error: insertError } = await supabase
+        .from('timetables')
+        .insert([{ key, data }]);
+      
+      if (insertError) throw insertError;
+    }
+    
+    console.log("✅ Расписание сохранено в Supabase");
+  } catch (err) {
+    console.log("❌ Ошибка при сохранении в Supabase:", err);
   }
+}
+
+async function saveProfileToSupabase(name) {
+  if (!supabase) return console.log("Supabase не инициализирован");
+  
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .insert([{ name }]);
+    
+    if (error && error.code !== "23505") throw error; // 23505 = UNIQUE violation
+    console.log("✅ Профиль сохранён в Supabase");
+  } catch (err) {
+    console.log("⚠️ Профиль может уже существовать или ошибка:", err);
+  }
+}
+
+async function deleteProfileFromSupabase(name) {
+  if (!supabase) return console.log("Supabase не инициализирован");
+  
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('name', name);
+    
+    if (error) throw error;
+    console.log("✅ Профиль удалён из Supabase");
+  } catch (err) {
+    console.log("❌ Ошибка при удалении профиля:", err);
+  }
+}
+
+async function saveRemoteClassToSupabase(className) {
+  if (!supabase) return console.log("Supabase не инициализирован");
+  
+  try {
+    const { error } = await supabase
+      .from('remote_classes')
+      .insert([{ class_name: className }]);
+    
+    if (error && error.code !== "23505") throw error;
+    console.log("✅ Класс добавлен в список домашнего обучения");
+  } catch (err) {
+    console.log("⚠️ Класс может быть уже добавлен или ошибка:", err);
+  }
+}
+
+async function removeRemoteClassFromSupabase(className) {
+  if (!supabase) return console.log("Supabase не инициализирован");
+  
+  try {
+    const { error } = await supabase
+      .from('remote_classes')
+      .delete()
+      .eq('class_name', className);
+    
+    if (error) throw error;
+    console.log("✅ Класс удалён из списка домашнего обучения");
+  } catch (err) {
+    console.log("❌ Ошибка при удалении класса:", err);
+  }
+}
+
+function loadData() {
+  loadDataFromLocalStorage();
 }
 </script>
 </body>
