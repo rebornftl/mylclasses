@@ -1,0 +1,51 @@
+name: Update Timetable
+
+on:
+  workflow_dispatch:
+    inputs:
+      className:
+        description: 'Класс (например: 5А)'
+        required: true
+      day:
+        description: 'День недели (1-6)'
+        required: true
+      data:
+        description: 'JSON с расписанием'
+        required: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Update Issue
+        run: |
+          gh issue view 1 --json body -q .body > current.json
+          
+          # Обновляем JSON (здесь простая замена, можно использовать jq)
+          echo '${{ github.event.inputs.data }}' | jq '.' > new_data.json
+          
+          # Читаем текущие данные
+          CURRENT=$(cat current.json)
+          CLASS="${{ github.event.inputs.className }}"
+          DAY="${{ github.event.inputs.day }}"
+          
+          # Обновляем через Node.js или Python
+          node -e "
+            const fs = require('fs');
+            const current = JSON.parse(fs.readFileSync('current.json'));
+            const newData = JSON.parse('${{ github.event.inputs.data }}');
+            
+            if (!current.timetables) current.timetables = {};
+            if (!current.timetables['$CLASS']) current.timetables['$CLASS'] = {};
+            current.timetables['$CLASS']['$DAY'] = newData;
+            current.lastUpdate = new Date().toISOString();
+            
+            fs.writeFileSync('updated.json', JSON.stringify(current, null, 2));
+          "
+          
+          # Обновляем Issue
+          gh issue edit 1 --body-file updated.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
