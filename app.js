@@ -2,7 +2,23 @@
 // ============ SUPABASE КОНФИГУРАЦИЯ ============
 const SUPABASE_URL = "https://vcdwobqhbbxodjjmwyex.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjZHdvYnFoYmJ4b2Rqam13eWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjg0MDIsImV4cCI6MjA4OTc0NDQwMn0.6V1JvPLIiEop73Dina2p9hljkWfdYWMbAizzPd1IqQ8";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Таймаут на одиночный запрос к Supabase (мс). На медленных RU-каналах
+// обрываем зависшие соединения и фолбэчим в localStorage вместо 30+ сек ожидания.
+const SUPABASE_REQUEST_TIMEOUT_MS = 7000;
+const supabase = (window.supabase && typeof window.supabase.createClient === "function")
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timeout after ${ms}ms${label ? `: ${label}` : ""}`)), ms);
+  });
+  return Promise.race([
+    Promise.resolve(promise).finally(() => clearTimeout(timer)),
+    timeout
+  ]);
+}
 
 // ============ КОНФИГУРАЦИЯ ============
 // В Supabase Auth создайте администратора и используйте его email и пароль.
@@ -285,9 +301,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   installEventDelegation();
   enhanceNavA11y();
   loadTheme();
-  await loadDataFromSupabase();
-  await initAuthState();
+
+  // Мгновенный рендер из localStorage — переключатель классов и кэш
+  // расписания появляются сразу, даже если Supabase ещё не ответил
+  // (или вообще недоступен на этом сетевом маршруте).
+  loadDataFromLocalStorage();
   generateClassOptions();
+
+  // Фоновая синхронизация с облаком — не блокирует первый экран.
+  // Когда придут свежие данные, перерисуем открытый экран.
+  loadDataFromSupabase().then(() => {
+    generateClassOptions();
+    if (document.getElementById("scheduleScreen")?.classList.contains("active")) {
+      renderTimetable();
+    }
+    if (document.getElementById("adminScreen")?.classList.contains("active")) {
+      renderAdminLessons();
+    }
+  }).catch(err => debug("Фоновая синхронизация упала:", err));
+
+  // Auth-состояние тоже без await — это не блокирует UI.
+  initAuthState().catch(err => debug("initAuthState failed:", err));
+
   updateDateTime();
   _dateTimer = setInterval(updateDateTime, 1000);
   _progressTimer = setInterval(updateLessonProgress, 30000);
@@ -688,15 +723,26 @@ function generateClassOptions() {
       classes.push(grade + "А", grade + "Б");
     }
   }
-  
+
   const settingsSelect = document.getElementById("settingsClass");
   const adminSelect = document.getElementById("adminClassSelect");
-  
-  classes.forEach(c => {
-    const e = escapeHtml(c);
-    settingsSelect.innerHTML += `<option value="${e}">${e}</option>`;
-    adminSelect.innerHTML += `<option value="${e}">${e}</option>`;
-  });
+
+  // Идемпотентно: функция может вызываться и до, и после загрузки из Supabase.
+  // Сохраняем текущее значение и первый пустой option-плейсхолдер.
+  const rebuild = (sel) => {
+    if (!sel) return;
+    const prev = sel.value;
+    const placeholder = sel.querySelector("option[value='']");
+    sel.innerHTML = "";
+    if (placeholder) sel.appendChild(placeholder.cloneNode(true));
+    classes.forEach(c => {
+      const e = escapeHtml(c);
+      sel.insertAdjacentHTML("beforeend", `<option value="${e}">${e}</option>`);
+    });
+    if (prev) sel.value = prev;
+  };
+  rebuild(settingsSelect);
+  rebuild(adminSelect);
   
   // Восстановить сохранённые настройки
   if (state.student.class) {
@@ -1514,12 +1560,15 @@ async function loadDataFromSupabase() {
     return;
   }
 
-  // Грузим все три раздела параллельно и независимо.
-  // Если один упал — подтягиваем его из localStorage, остальные продолжают работать.
+  // Грузим все три раздела параллельно и независимо, с таймаутом на каждый.
+  // Если один упал/отвалился по таймауту — подтягиваем его из localStorage,
+  // остальные продолжают работать. select(...) с точными колонками — меньше
+  // байт в ответе, быстрее парсинг, заметно на медленных RU-каналах.
+  const T = SUPABASE_REQUEST_TIMEOUT_MS;
   const results = await Promise.allSettled([
-    supabase.from('timetables').select('*'),
-    supabase.from('profiles').select('*'),
-    supabase.from('remote_classes').select('class_name')
+    withTimeout(supabase.from('timetables').select('key,data'),       T, 'timetables'),
+    withTimeout(supabase.from('profiles').select('name'),              T, 'profiles'),
+    withTimeout(supabase.from('remote_classes').select('class_name'), T, 'remote_classes')
   ]);
 
   // Расписание
