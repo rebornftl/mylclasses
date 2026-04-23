@@ -6,962 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
-  <style>
-    :root {
-      --bg: #f3f4f6;
-      --fg: #111827;
-      --accent: #2563eb;
-      --accent-soft: #dbeafe;
-      --card: #ffffff;
-      --border: #e5e7eb;
-      --muted: #6b7280;
-      --danger: #b91c1c;
-      --success: #15803d;
-    }
-    [data-theme="dark"] {
-      --bg: #030712;
-      --fg: #e5e7eb;
-      --accent: #1e3a8a;
-      --accent-soft: rgba(30,58,138,0.12);
-      --card: #020617;
-      --border: #1f2933;
-      --muted: #9ca3af;
-      --danger: #fecaca;
-      --success: #86efac;
-    }
-    * {
-      box-sizing: border-box;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
-    }
-    body {
-      margin: 0;
-      background: radial-gradient(circle at top, #e5e7eb 0, var(--bg) 40%, var(--bg) 100%);
-      color: var(--fg);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    /* Начальный экран */
-    #startScreen {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: var(--bg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 20px;
-    }
-    .start-logo {
-      width: 112px;
-      height: 112px;
-      border-radius: 28px;
-      background: linear-gradient(160deg, #1d4ed8, #111827);
-      color: #f4f0e8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 22px 62px rgba(16, 30, 40, 0.24);
-      margin-bottom: 32px;
-      animation: floatSoft 8s ease-in-out infinite;
-    }
-    .start-logo::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 22% 22%, rgba(255,255,255,0.24), transparent 24%);
-      pointer-events: none;
-    }
-    .start-logo svg {
-      width: 72px;
-      height: 72px;
-      color: #f4f0e8;
-    }
-    .start-title {
-      font-size: 44px;
-      font-weight: 800;
-      margin-bottom: 14px;
-      text-align: center;
-      letter-spacing: -0.04em;
-      line-height: 1.05;
-      text-transform: uppercase;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.08);
-    }
-    .start-subtitle {
-      font-size: 18px;
-      color: var(--muted);
-      margin-bottom: 48px;
-      text-align: center;
-      max-width: 420px;
-      line-height: 1.6;
-    }
-    .start-btn {
-      padding: 18px 52px;
-      font-size: 19px;
-      border-radius: 999px;
-      border: none;
-      background: linear-gradient(135deg, var(--accent), #1d4ed8);
-      color: #f8fafc;
-      cursor: pointer;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      box-shadow: 0 12px 34px rgba(37,99,235,0.26);
-      transition: transform 0.28s ease, box-shadow 0.28s ease;
-    }
-    .start-btn:hover {
-      transform: translateY(-3px) scale(1.01);
-      box-shadow: 0 16px 42px rgba(37,99,235,0.32);
-    }
-
-    /* Скрытая кнопка админа - в левом нижнем углу, очень незаметная */
-    .admin-corner-btn {
-      position: fixed;
-      bottom: 30px;
-      left: 30px;
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      opacity: 0.15;
-      font-size: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s;
-    }
-    .admin-corner-btn:hover {
-      opacity: 1;
-      background: var(--card);
-      border-color: var(--border);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    }
-
-    /* Или вариант с текстом "Для администрации" */
-    .admin-text-link {
-      position: fixed;
-      bottom: 30px;
-      right: 30px;
-      font-size: 13px;
-      color: var(--muted);
-      opacity: 0.3;
-      cursor: pointer;
-      padding: 8px 16px;
-      border-radius: 8px;
-      transition: all 0.3s;
-      border: 1px solid transparent;
-    }
-    .admin-text-link:hover {
-      opacity: 1;
-      background: var(--card);
-      border-color: var(--border);
-    }
-
-    /* Основной layout */
-    .app-container {
-      display: none;
-      flex: 1;
-      flex-direction: column;
-    }
-    
-    /* Боковая навигация (ПК) */
-    .sidebar {
-      position: fixed;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 280px;
-      background: var(--card);
-      border-right: 1px solid var(--border);
-      padding: 28px 20px;
-      display: flex;
-      flex-direction: column;
-      z-index: 100;
-    }
-    .sidebar-brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 48px;
-      padding: 0 12px;
-    }
-    .sidebar-logo {
-      width: 54px;
-      height: 54px;
-      border-radius: 16px;
-      background: conic-gradient(from 210deg, #111827, #2563eb, #111827);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      color: #f9fafb;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 18px 48px rgba(10, 28, 40, 0.14);
-    }
-    .sidebar-logo::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 30% 28%, rgba(255,255,255,0.22), transparent 24%);
-      pointer-events: none;
-    }
-    .sidebar-logo svg {
-      width: 26px;
-      height: 26px;
-    }
-    .sidebar-brand-text {
-      font-size: 24px;
-      font-weight: 800;
-    }
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 18px;
-      border-radius: 16px;
-      cursor: pointer;
-      margin-bottom: 8px;
-      color: var(--muted);
-      transition: all 0.24s ease;
-      font-size: 15px;
-      font-weight: 500;
-    }
-    .nav-item:hover, .nav-item.active {
-      background: var(--accent-soft);
-      color: var(--accent);
-    }
-    .nav-item.active {
-      font-weight: 600;
-    }
-    .nav-icon,
-    .bottom-nav-icon,
-    .theme-icon,
-    .admin-corner-btn svg {
-      width: 24px;
-      height: 24px;
-      display: block;
-    }
-    .nav-icon svg,
-    .bottom-nav-icon svg,
-    .theme-icon svg,
-    .admin-corner-btn svg {
-      width: 100%;
-      height: 100%;
-      stroke: currentColor;
-      fill: none;
-    }
-    .sidebar-footer {
-      margin-top: auto;
-      padding: 20px;
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-      opacity: 0.7;
-    }
-    
-    /* Основной контент */
-    .main-content {
-      margin-left: 280px;
-      flex: 1;
-      padding: 32px 40px;
-      max-width: calc(100% - 280px);
-    }
-    
-    /* Нижняя навигация (мобильная) */
-    .bottom-nav {
-      display: none;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: var(--card);
-      border-top: 1px solid var(--border);
-      padding: 12px 24px 28px;
-      justify-content: space-around;
-      z-index: 100;
-      backdrop-filter: blur(20px);
-    }
-    .bottom-nav-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      padding: 10px 20px;
-      border-radius: 16px;
-      cursor: pointer;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-    .bottom-nav-item.active {
-      color: var(--accent);
-      background: var(--accent-soft);
-    }
-    .bottom-nav-icon {
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-    }
-
-    /* Тема переключатель */
-    .theme-toggle {
-      position: fixed;
-      top: 24px;
-      right: 24px;
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 14px;
-      color: var(--muted);
-      cursor: pointer;
-      user-select: none;
-      padding: 12px 18px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      backdrop-filter: blur(12px);
-      z-index: 50;
-      box-shadow: 0 18px 45px rgba(5,15,26,0.16);
-      animation: floatSoft 9s ease-in-out infinite;
-    }
-    .theme-label {
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--fg);
-    }
-    .theme-icon {
-      width: 22px;
-      height: 22px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent);
-    }
-    .switch {
-      width: 46px;
-      height: 24px;
-      border-radius: 999px;
-      background: var(--border);
-      position: relative;
-      transition: background 0.2s;
-    }
-    .switch::after {
-      content: "";
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      background: var(--card);
-      top: 3px;
-      left: 3px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
-      transition: transform 0.2s;
-    }
-    .switch.on {
-      background: var(--accent);
-    }
-    .switch.on::after {
-      transform: translateX(20px);
-    }
-    @keyframes floatSoft {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
-    }
-
-    /* Карточки */
-    .card {
-      background: var(--card);
-      border-radius: 24px;
-      border: 1px solid var(--border);
-      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-      padding: 32px;
-      margin-bottom: 24px;
-    }
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 28px;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    .card-title {
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
-    .card-subtitle {
-      font-size: 15px;
-      color: var(--muted);
-      margin-top: 6px;
-    }
-
-    /* Экраны */
-    .screen {
-      display: none;
-    }
-    .screen.active {
-      display: block;
-    }
-
-    /* Формы */
-    label {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--fg);
-      display: block;
-      margin-bottom: 10px;
-    }
-    select, input[type="text"], input[type="password"], input[type="number"] {
-      width: 100%;
-      padding: 14px 18px;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      color: var(--fg);
-      font-size: 16px;
-      transition: all 0.2s;
-    }
-    select:focus, input:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 4px var(--accent-soft);
-    }
-    .form-group {
-      margin-bottom: 24px;
-    }
-    .form-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 20px;
-    }
-    @media (max-width: 640px) {
-      .form-row {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Кнопки */
-    button {
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--fg);
-      padding: 14px 24px;
-      font-size: 15px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s;
-      font-weight: 600;
-    }
-    button:hover {
-      background: var(--bg);
-      transform: translateY(-1px);
-    }
-    button.primary {
-      background: linear-gradient(135deg, var(--accent), #1d4ed8);
-      color: #f9fafb;
-      border-color: transparent;
-      box-shadow: 0 6px 20px rgba(37,99,235,0.3);
-    }
-    button.primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 28px rgba(37,99,235,0.4);
-    }
-    button.danger {
-      background: #fee2e2;
-      color: var(--danger);
-      border-color: transparent;
-    }
-    button.danger:hover {
-      background: #fecaca;
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none !important;
-    }
-    .btn-icon,
-    .inline-icon,
-    .empty-state-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent);
-      margin-right: 8px;
-    }
-    .btn-icon,
-    .inline-icon {
-      width: 18px;
-      height: 18px;
-    }
-    .empty-state-icon {
-      width: 60px;
-      height: 60px;
-      margin: 0 auto 16px;
-      color: var(--accent);
-    }
-    .btn-icon svg,
-    .inline-icon svg,
-    .empty-state-icon svg,
-    .delete-icon svg {
-      width: 100%;
-      height: 100%;
-      stroke: currentColor;
-      fill: none;
-    }
-
-    /* Расписание */
-    .day-selector {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 28px;
-      flex-wrap: wrap;
-    }
-    .day-btn {
-      padding: 12px 24px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      cursor: pointer;
-      font-size: 15px;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-    .day-btn:hover {
-      background: var(--bg);
-      transform: translateY(-1px);
-    }
-    .day-btn.active {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-      box-shadow: 0 4px 16px rgba(37,99,235,0.3);
-    }
-    .day-btn.sunday {
-      opacity: 0.3;
-      cursor: not-allowed;
-      background: var(--bg);
-    }
-
-    .timetable-grid {
-      border-radius: 20px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: var(--card);
-    }
-    .lesson-row {
-      display: grid;
-      grid-template-columns: 70px 1fr 160px 100px 1.2fr;
-      border-bottom: 1px solid var(--border);
-      font-size: 16px;
-      min-height: 80px;
-      align-items: center;
-      transition: background 0.2s;
-    }
-    .lesson-row:hover {
-      background: var(--bg);
-    }
-    .lesson-row:last-child {
-      border-bottom: none;
-    }
-    .lesson-row.header {
-      background: var(--accent-soft);
-      font-weight: 700;
-      min-height: 56px;
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .lesson-cell {
-      padding: 20px;
-      display: flex;
-      align-items: center;
-    }
-    .lesson-index {
-      justify-content: center;
-      font-weight: 800;
-      color: var(--accent);
-      font-size: 22px;
-    }
-    .lesson-subject {
-      font-weight: 700;
-      font-size: 17px;
-    }
-    .lesson-time {
-      color: var(--muted);
-      font-size: 15px;
-      font-weight: 500;
-    }
-    .lesson-cabinet {
-      background: var(--accent-soft);
-      color: var(--accent);
-      padding: 8px 16px;
-      border-radius: 999px;
-      font-size: 14px;
-      font-weight: 700;
-    }
-    .lesson-cell--status {
-      align-items: stretch;
-    }
-    .lesson-status {
-      font-size: 14px;
-      width: 100%;
-    }
-    .lesson-status-card {
-      padding: 12px 14px;
-      border-radius: 16px;
-      background: linear-gradient(145deg, var(--accent-soft) 0%, var(--bg) 100%);
-      border: 1px solid var(--border);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    }
-    [data-theme="dark"] .lesson-status-card {
-      background: linear-gradient(145deg, rgba(37, 99, 235, 0.12) 0%, rgba(15, 23, 42, 0.85) 100%);
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-      border-color: rgba(148, 163, 184, 0.2);
-    }
-    .progress-bar {
-      width: 100%;
-      height: 10px;
-      border-radius: 999px;
-      background: var(--border);
-      overflow: hidden;
-      margin-top: 10px;
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
-    }
-    [data-theme="dark"] .lesson-status-card .progress-bar {
-      background: rgba(255, 255, 255, 0.08);
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
-    }
-    .progress-inner {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--accent), #22c55e);
-      transition: width 0.4s linear;
-      border-radius: 999px;
-      box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
-    }
-    [data-theme="dark"] .progress-inner {
-      box-shadow: 0 0 14px rgba(96, 165, 250, 0.25);
-    }
-    .status-text {
-      font-weight: 700;
-      margin-bottom: 2px;
-      font-size: 15px;
-      line-height: 1.35;
-      letter-spacing: -0.01em;
-      transition: color 0.2s;
-    }
-    .status-text.status--pending {
-      color: var(--muted);
-    }
-    .status-text.status--live {
-      color: var(--accent);
-    }
-    .status-text.status--done {
-      color: var(--success);
-    }
-    .status-text.status--future {
-      color: var(--muted);
-    }
-    .status-text.status--past {
-      color: var(--success);
-    }
-    .status-text.status--idle {
-      color: var(--muted);
-    }
-    .status-time {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    /* Плашка домашнего обучения */
-    .remote-banner {
-      background: linear-gradient(135deg, #fef3c7, #fde68a);
-      border: 2px solid #f59e0b;
-      color: #92400e;
-      padding: 24px 32px;
-      border-radius: 20px;
-      margin-bottom: 24px;
-      font-weight: 700;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.2);
-    }
-    [data-theme="dark"] .remote-banner {
-      background: linear-gradient(135deg, #451a03, #78350f);
-      color: #fcd34d;
-      border-color: #b45309;
-    }
-
-    /* Админ панель */
-    .admin-section {
-      margin-bottom: 40px;
-      padding-bottom: 32px;
-      border-bottom: 1px solid var(--border);
-    }
-    .admin-section:last-child {
-      border-bottom: none;
-    }
-    .admin-section-title {
-      font-size: 20px;
-      font-weight: 800;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .lessons-editor {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .lesson-editor-row {
-      display: grid;
-      grid-template-columns: 60px 1fr 100px 100px 100px 48px;
-      gap: 12px;
-      align-items: center;
-      padding: 16px;
-      background: var(--bg);
-      border-radius: 16px;
-      border: 1px solid var(--border);
-    }
-    .schedule-date-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px 20px;
-      margin-bottom: 20px;
-    }
-    .input-date-themed {
-      max-width: 220px;
-      padding: 12px 16px;
-      background: var(--card);
-      color: var(--fg);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-    }
-    [data-theme="dark"] .input-date-themed {
-      color-scheme: dark;
-      background: var(--card);
-      color: var(--fg);
-      border-color: var(--border);
-    }
-    [data-theme="dark"] .input-date-themed::-webkit-calendar-picker-indicator {
-      filter: invert(0.88);
-      opacity: 0.9;
-      cursor: pointer;
-    }
-    .admin-day-context {
-      font-size: 15px;
-      color: var(--accent);
-      font-weight: 700;
-      margin-bottom: 16px;
-      padding: 14px 18px;
-      background: var(--accent-soft);
-      border-radius: 14px;
-      border: 1px solid var(--border);
-    }
-    .lesson-editor-row input, .lesson-editor-row select {
-      margin: 0;
-      padding: 12px;
-      font-size: 14px;
-    }
-    .delete-lesson-btn {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #fee2e2;
-      color: var(--danger);
-      border: none;
-      font-size: 20px;
-      font-weight: 700;
-    }
-    .delete-lesson-btn:hover {
-      background: #fecaca;
-      transform: scale(1.05);
-    }
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin: 16px 0;
-      padding: 16px;
-      background: var(--bg);
-      border-radius: 14px;
-      cursor: pointer;
-    }
-    .checkbox-group input[type="checkbox"] {
-      width: 24px;
-      height: 24px;
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
-    .checkbox-group label {
-      margin: 0;
-      cursor: pointer;
-      font-size: 15px;
-    }
-
-    /* Калькулятор */
-    .calc-container {
-      background: var(--bg);
-      border-radius: 20px;
-      padding: 28px;
-    }
-    .grade-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      background: var(--card);
-      border-radius: 16px;
-      margin-bottom: 12px;
-      border: 1px solid var(--border);
-    }
-    .grade-info {
-      display: flex;
-      gap: 20px;
-      align-items: center;
-    }
-    .grade-value {
-      font-size: 32px;
-      font-weight: 800;
-      color: var(--accent);
-      width: 50px;
-      text-align: center;
-    }
-    .stats-row {
-      display: flex;
-      gap: 16px;
-      margin-top: 24px;
-      flex-wrap: wrap;
-    }
-    .stat-chip {
-      background: var(--card);
-      padding: 16px 24px;
-      border-radius: 16px;
-      font-size: 15px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border: 1px solid var(--border);
-      font-weight: 600;
-    }
-    .stat-value {
-      font-size: 24px;
-      font-weight: 800;
-      color: var(--accent);
-    }
-
-    /* Модальное окно */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(8px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      padding: 20px;
-    }
-    .modal-overlay.active {
-      display: flex;
-    }
-    .modal {
-      background: var(--card);
-      border-radius: 28px;
-      padding: 40px;
-      max-width: 480px;
-      width: 100%;
-      box-shadow: 0 40px 100px rgba(0,0,0,0.3);
-      border: 1px solid var(--border);
-    }
-    .modal-title {
-      font-size: 24px;
-      font-weight: 800;
-      margin-bottom: 28px;
-      text-align: center;
-    }
-
-    /* Адаптивность */
-    @media (max-width: 1024px) {
-      .sidebar {
-        display: none;
-      }
-      .main-content {
-        margin-left: 0;
-        max-width: 100%;
-        padding: 100px 20px 120px;
-      }
-      .bottom-nav {
-        display: flex;
-      }
-      .theme-toggle {
-        top: 20px;
-        right: 20px;
-      }
-      .lesson-row {
-        grid-template-columns: 50px 1fr 120px;
-        gap: 12px;
-      }
-      .lesson-row .lesson-cell:nth-child(4),
-      .lesson-row .lesson-cell:nth-child(5) {
-        grid-column: 2 / 4;
-        padding-top: 0;
-      }
-      .lesson-editor-row {
-        grid-template-columns: 40px 1fr 80px;
-        gap: 10px;
-      }
-      .lesson-editor-row input:nth-child(4),
-      .lesson-editor-row input:nth-child(5) {
-        display: none;
-      }
-      .start-title {
-        font-size: 32px;
-      }
-      .admin-corner-btn {
-        bottom: 20px;
-        left: 20px;
-      }
-    }
-
-    .hidden {
-      display: none !important;
-    }
-    .mt-4 { margin-top: 20px; }
-    .mt-6 { margin-top: 32px; }
-    .mb-4 { margin-bottom: 20px; }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-theme="light">
   <!-- Начальный экран -->
@@ -974,10 +19,10 @@
     </div>
     <div class="start-title">Твои Уроки</div>
     <div class="start-subtitle">Удобное расписание для учеников 5–11 классов с интеллектуальным трекером уроков</div>
-    <button class="start-btn" onclick="enterAsStudent()">Войти как ученик</button>
+    <button class="start-btn" data-action="enterAsStudent">Войти как ученик</button>
     
     <!-- СКРЫТАЯ КНОПКА АДМИНА - в левом нижнем углу, почти невидимая -->
-    <button class="admin-corner-btn" onclick="showAdminLogin()" title="Вход для администратора" aria-label="Вход для администратора">
+    <button class="admin-corner-btn" data-action="showAdminLogin" title="Вход для администратора" aria-label="Вход для администратора">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
         <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="1.8" fill="none"/>
@@ -986,7 +31,7 @@
     </button>
     
     <!-- Альтернативный вариант - текстовая ссылка справа внизу -->
-    <!-- <div class="admin-text-link" onclick="showAdminLogin()">Для администрации</div> -->
+    <!-- <div class="admin-text-link" data-action="showAdminLogin">Для администрации</div> -->
   </div>
 
   <!-- Модальное окно входа админа -->
@@ -1002,8 +47,8 @@
         <input type="password" id="adminPasswordInput" placeholder="Введите пароль" />
       </div>
       <div style="display: flex; gap: 12px; margin-top: 32px;">
-        <button onclick="closeAdminLogin()" style="flex: 1;">Отмена</button>
-        <button class="primary" onclick="loginAdmin()" style="flex: 1;">Войти</button>
+        <button data-action="closeAdminLogin" style="flex: 1;">Отмена</button>
+        <button class="primary" data-action="loginAdmin" style="flex: 1;">Войти</button>
       </div>
       <p id="adminLoginError" style="color: var(--danger); margin-top: 16px; font-size: 14px; text-align: center;"></p>
     </div>
@@ -1021,7 +66,7 @@
       </div>
         <div class="sidebar-brand-text">Твои Уроки</div>
       </div>
-      <div class="nav-item active" onclick="showScreen('schedule')" data-nav="schedule">
+      <div class="nav-item active" data-action="showScreen" data-screen="schedule" data-nav="schedule">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1029,7 +74,7 @@
         </span>
         Расписание
       </div>
-      <div class="nav-item" onclick="showScreen('calculator')" data-nav="calculator" id="calcNavItem" style="display: none;">
+      <div class="nav-item" data-action="showScreen" data-screen="calculator" data-nav="calculator" id="calcNavItem" style="display: none;">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <rect x="4" y="2" width="16" height="20" rx="2" ry="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
@@ -1042,7 +87,7 @@
         </span>
         Калькулятор
       </div>
-      <div class="nav-item" onclick="showScreen('settings')" data-nav="settings" id="settingsNavItem" style="display: none;">
+      <div class="nav-item" data-action="showScreen" data-screen="settings" data-nav="settings" id="settingsNavItem" style="display: none;">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
@@ -1051,7 +96,7 @@
         </span>
         Настройки
       </div>
-      <div class="nav-item" onclick="showScreen('admin')" data-nav="admin" id="adminNavItem" style="display: none;">
+      <div class="nav-item" data-action="showScreen" data-screen="admin" data-nav="admin" id="adminNavItem" style="display: none;">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1066,7 +111,7 @@
 
     <!-- Нижняя навигация (мобильная) -->
     <nav class="bottom-nav" id="bottomNav">
-      <div class="bottom-nav-item active" onclick="showScreen('schedule')" data-nav="schedule">
+      <div class="bottom-nav-item active" data-action="showScreen" data-screen="schedule" data-nav="schedule">
         <div class="bottom-nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1074,7 +119,7 @@
         </div>
         <span>Расписание</span>
       </div>
-      <div class="bottom-nav-item" onclick="showScreen('calculator')" data-nav="calculator" id="calcBottomItem" style="display: none;">
+      <div class="bottom-nav-item" data-action="showScreen" data-screen="calculator" data-nav="calculator" id="calcBottomItem" style="display: none;">
         <div class="bottom-nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <rect x="4" y="2" width="16" height="20" rx="2" ry="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
@@ -1087,7 +132,7 @@
         </div>
         <span>Калькулятор</span>
       </div>
-      <div class="bottom-nav-item" onclick="showScreen('settings')" data-nav="settings" id="settingsBottomItem" style="display: none;">
+      <div class="bottom-nav-item" data-action="showScreen" data-screen="settings" data-nav="settings" id="settingsBottomItem" style="display: none;">
         <div class="bottom-nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
@@ -1096,7 +141,7 @@
         </div>
         <span>Настройки</span>
       </div>
-      <div class="bottom-nav-item" onclick="showScreen('admin')" data-nav="admin" id="adminBottomItem" style="display: none;">
+      <div class="bottom-nav-item" data-action="showScreen" data-screen="admin" data-nav="admin" id="adminBottomItem" style="display: none;">
         <div class="bottom-nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1106,8 +151,8 @@
       </div>
     </nav>
 
-    <!-- Переключатель темы -->
-    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Переключить тему">
+    <!-- Переключатель Светлая/Тёмная (другие темы — в Настройках) -->
+    <div class="theme-toggle" id="themeToggle" data-action="toggleTheme" title="Светлая/тёмная (остальные темы — в Настройках)" aria-label="Переключить тему">
       <span class="theme-icon" id="themeIcon" aria-hidden="true"></span>
       <span class="theme-label">Тема</span>
       <div class="switch" id="themeSwitch"></div>
@@ -1128,7 +173,7 @@
           <div class="form-row">
             <div class="form-group">
               <label for="settingsClass">Класс</label>
-              <select id="settingsClass" onchange="onClassChange()">
+              <select id="settingsClass" data-change="onClassChange">
                 <option value="">Выберите класс...</option>
               </select>
             </div>
@@ -1156,9 +201,60 @@
             </div>
           </div>
 
-          <button class="primary mt-6" onclick="saveStudentSettings()" style="width: 100%;">
+          <button class="primary mt-6" data-action="saveStudentSettings" style="width: 100%;">
             Сохранить и перейти к расписанию
           </button>
+        </div>
+
+        <!-- Выбор темы оформления (выдвижной) -->
+        <div class="card collapsible" id="themeCollapsible">
+          <div class="collapsible-header" data-action="toggleThemeCollapsible" role="button" tabindex="0"
+               aria-expanded="false" aria-controls="themeCollapsibleBody">
+            <div>
+              <div class="card-title">Тема оформления</div>
+              <div class="card-subtitle">Выберите, как будет выглядеть приложение. Настройка сохраняется на этом устройстве.</div>
+            </div>
+            <span class="collapsible-chevron" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </div>
+          <div class="collapsible-body" id="themeCollapsibleBody">
+            <div class="collapsible-body-inner">
+              <div class="theme-picker" id="themePicker" role="radiogroup" aria-label="Выбор темы"></div>
+
+              <!-- Свои обои -->
+              <div class="theme-setting" id="wallpaperSetting">
+                <div class="theme-setting-head">
+                  <div>
+                    <div class="theme-setting-title">Свои обои</div>
+                    <div class="theme-setting-desc">Загрузите картинку с устройства. Применяется как фон приложения.</div>
+                  </div>
+                  <div class="theme-setting-preview" id="wallpaperPreview" aria-hidden="true"></div>
+                </div>
+                <div class="theme-setting-controls">
+                  <label class="btn-soft">
+                    <input type="file" accept="image/*" id="wallpaperFile" data-change="onWallpaperFile" hidden />
+                    Выбрать файл
+                  </label>
+                  <button type="button" class="btn-soft btn-danger-soft" data-action="clearWallpaper">Убрать</button>
+                </div>
+              </div>
+
+              <!-- Сила размытия стекла -->
+              <div class="theme-setting" id="glassSetting">
+                <div class="theme-setting-head">
+                  <div>
+                    <div class="theme-setting-title">Сила стекла</div>
+                    <div class="theme-setting-desc">Доступно для тем: iOS Стекло, iOS Стекло (тёмная), Закат.</div>
+                  </div>
+                  <div class="theme-setting-badge" id="glassStrengthLabel">22px</div>
+                </div>
+                <div class="theme-setting-controls">
+                  <input type="range" id="glassStrength" min="0" max="40" step="1" value="22" data-input="onGlassStrengthInput" class="range-input" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1175,21 +271,21 @@
               <div class="card-title" id="scheduleTitle">Расписание</div>
               <div class="card-subtitle" id="scheduleSubtitle">Выберите класс в настройках</div>
             </div>
-            <button onclick="showScreen('settings')">Изменить класс</button>
+            <button data-action="showScreen" data-screen="settings">Изменить класс</button>
           </div>
 
           <div class="schedule-date-row">
             <label for="scheduleDateInput" style="margin: 0;">Дата</label>
-            <input type="date" class="input-date-themed" id="scheduleDateInput" onchange="onScheduleDateChange(event)" />
+            <input type="date" class="input-date-themed" id="scheduleDateInput" data-change="onScheduleDateChange" />
           </div>
 
           <div class="day-selector" id="daySelector">
-            <button class="day-btn" onclick="selectDay(1)">Пн</button>
-            <button class="day-btn" onclick="selectDay(2)">Вт</button>
-            <button class="day-btn" onclick="selectDay(3)">Ср</button>
-            <button class="day-btn" onclick="selectDay(4)">Чт</button>
-            <button class="day-btn" onclick="selectDay(5)">Пт</button>
-            <button class="day-btn" onclick="selectDay(6)">Сб</button>
+            <button class="day-btn" data-action="selectDay" data-day="1">Пн</button>
+            <button class="day-btn" data-action="selectDay" data-day="2">Вт</button>
+            <button class="day-btn" data-action="selectDay" data-day="3">Ср</button>
+            <button class="day-btn" data-action="selectDay" data-day="4">Чт</button>
+            <button class="day-btn" data-action="selectDay" data-day="5">Пт</button>
+            <button class="day-btn" data-action="selectDay" data-day="6">Сб</button>
             <button class="day-btn sunday" disabled title="Воскресенье — выходной">Вс</button>
           </div>
 
@@ -1240,7 +336,7 @@
             </div>
           </div>
 
-          <button class="primary mt-4" onclick="addGrade()" style="width: 100%;">
+          <button class="primary mt-4" data-action="addGrade" style="width: 100%;">
             <span class="btn-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>
@@ -1259,7 +355,7 @@
               <div class="stat-chip">
                 Оценок: <span class="stat-value" id="gradesCount">0</span>
               </div>
-              <button onclick="resetGrades()">
+              <button data-action="resetGrades">
                 <span class="btn-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </span>
@@ -1278,7 +374,7 @@
               <div class="card-title"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Административная панель</div>
               <div class="card-subtitle">Управление расписанием, классами и настройками системы</div>
             </div>
-            <button onclick="logoutAdmin()" class="danger">Выйти</button>
+            <button data-action="logoutAdmin" class="danger">Выйти</button>
           </div>
 
           <!-- Выбор класса для редактирования -->
@@ -1287,24 +383,24 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Класс</label>
-                <select id="adminClassSelect" onchange="onAdminClassChange()"></select>
+                <select id="adminClassSelect" data-change="onAdminClassChange"></select>
               </div>
               <div class="form-group">
                 <label>Группа математики</label>
-                <select id="adminMathGroupSelect" onchange="onAdminGroupOrProfileChange()">
+                <select id="adminMathGroupSelect" data-change="onAdminGroupOrProfileChange">
                   <option value="">Без группы</option>
                 </select>
               </div>
               <div class="form-group">
                 <label>Профиль обучения</label>
-                <select id="adminProfileSelect" onchange="onAdminGroupOrProfileChange()">
+                <select id="adminProfileSelect" data-change="onAdminGroupOrProfileChange">
                   <option value="">Без профиля</option>
                 </select>
               </div>
             </div>
             
             <div class="checkbox-group mt-4">
-              <input type="checkbox" id="remoteLearningCheck" onchange="toggleRemoteLearning()" />
+              <input type="checkbox" id="remoteLearningCheck" data-change="toggleRemoteLearning" />
               <label for="remoteLearningCheck">
                 <span class="inline-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9,22 9,12 15,12 15,22" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 Перевести класс на домашнее обучение
@@ -1317,16 +413,16 @@
             <div class="admin-section-title"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="4" stroke="currentColor" stroke-width="1.8"/><path d="M7 9.5h10M7 13.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>Редактирование расписания</div>
             <div class="schedule-date-row">
               <label for="adminScheduleDateInput" style="margin: 0;">Дата (календарь)</label>
-              <input type="date" class="input-date-themed" id="adminScheduleDateInput" onchange="onAdminScheduleDateChange(event)" />
+              <input type="date" class="input-date-themed" id="adminScheduleDateInput" data-change="onAdminScheduleDateChange" />
             </div>
             <p class="admin-day-context" id="adminEditingDayLabel">Выберите день недели</p>
             <div class="day-selector">
-              <button class="day-btn" onclick="selectAdminDay(1)">Пн</button>
-              <button class="day-btn" onclick="selectAdminDay(2)">Вт</button>
-              <button class="day-btn" onclick="selectAdminDay(3)">Ср</button>
-              <button class="day-btn" onclick="selectAdminDay(4)">Чт</button>
-              <button class="day-btn" onclick="selectAdminDay(5)">Пт</button>
-              <button class="day-btn" onclick="selectAdminDay(6)">Сб</button>
+              <button class="day-btn" data-action="selectAdminDay" data-day="1">Пн</button>
+              <button class="day-btn" data-action="selectAdminDay" data-day="2">Вт</button>
+              <button class="day-btn" data-action="selectAdminDay" data-day="3">Ср</button>
+              <button class="day-btn" data-action="selectAdminDay" data-day="4">Чт</button>
+              <button class="day-btn" data-action="selectAdminDay" data-day="5">Пт</button>
+              <button class="day-btn" data-action="selectAdminDay" data-day="6">Сб</button>
               <button class="day-btn sunday" disabled title="Воскресенье недоступно">Вс</button>
             </div>
           </div>
@@ -1336,8 +432,8 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
               <div class="admin-section-title" style="margin: 0;"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="10" y1="9" x2="8" y2="9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Уроки</div>
               <div style="display: flex; gap: 10px;">
-                <button onclick="addNewLesson()"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>Добавить урок</button>
-                <button onclick="clearAllLessons()" class="danger"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 7h12M9 7V5h6v2M8 7v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg></span>Очистить всё</button>
+                <button data-action="addNewLesson"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>Добавить урок</button>
+                <button data-action="clearAllLessons" class="danger"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 7h12M9 7V5h6v2M8 7v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg></span>Очистить всё</button>
               </div>
             </div>
             
@@ -1353,7 +449,7 @@
             <div class="admin-section-title"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 3L5 14h5l-1 7 8-11h-5l1-7z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Дополнительные настройки</div>
             
             <div class="checkbox-group">
-              <input type="checkbox" id="bigBreakLessonCheck" onchange="toggleBigBreakLesson()" />
+              <input type="checkbox" id="bigBreakLessonCheck" />
               <label for="bigBreakLessonCheck">
                 <span class="inline-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="10" y1="9" x2="8" y2="9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 Урок на большой перемене (12:25–13:15)
@@ -1361,7 +457,7 @@
             </div>
 
             <div class="checkbox-group">
-              <input type="checkbox" id="ninthLessonCheck" onchange="toggleNinthLesson()" />
+              <input type="checkbox" id="ninthLessonCheck" data-change="toggleNinthLesson" />
               <label for="ninthLessonCheck">
                 <span class="inline-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M10 8h4v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
                 Девятый урок
@@ -1396,13 +492,13 @@
                 <input type="text" id="newProfileName" placeholder="Название нового профиля (например: Технологический)" />
               </div>
               <div class="form-group">
-                <button onclick="addProfile()" class="primary" style="width: 100%;"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>Добавить профиль</button>
+                <button data-action="addProfile" class="primary" style="width: 100%;"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>Добавить профиль</button>
               </div>
             </div>
             <div id="profilesList" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px;"></div>
           </div>
 
-          <button class="primary mt-6" onclick="saveAdminTimetable()" style="width: 100%; padding: 18px; font-size: 17px;">
+          <button class="primary mt-6" data-action="saveAdminTimetable" style="width: 100%; padding: 18px; font-size: 17px;">
             <span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 7h12M9 7V5h6v2M6 7v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M8 11h8M8 15h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
             Сохранить расписание
           </button>
@@ -1412,1325 +508,6 @@
     </main>
   </div>
 
-<script>
-// ============ SUPABASE КОНФИГУРАЦИЯ ============
-const SUPABASE_URL = "https://vcdwobqhbbxodjjmwyex.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjZHdvYnFoYmJ4b2Rqam13eWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjg0MDIsImV4cCI6MjA4OTc0NDQwMn0.6V1JvPLIiEop73Dina2p9hljkWfdYWMbAizzPd1IqQ8";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ============ КОНФИГУРАЦИЯ ============
-// В Supabase Auth создайте администратора и используйте его email и пароль.
-// Хранить логин/пароль администратора в клиентском коде небезопасно.
-const STORAGE_KEYS = {
-  THEME: "tu_theme",
-  STUDENT: "tu_student",
-  GRADES: "tu_grades",
-  TIMETABLES: "tu_timetables",
-  PROFILES: "tu_profiles",
-  REMOTE: "tu_remote"
-};
-
-// ============ ДАННЫЕ ============
-const WEEKDAYS = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
-let PROFILES = ["ФМИ", "ИМ", "ФХ", "ЕН", "СЭ"];
-
-function formatDateForInput(d) {
-  const x = new Date(d);
-  const y = x.getFullYear();
-  const m = String(x.getMonth() + 1).padStart(2, "0");
-  const day = String(x.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function parseISODate(s) {
-  if (!s) return new Date();
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function getMondayOfWeek(d) {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
-  date.setHours(12, 0, 0, 0);
-  return date;
-}
-
-/** day: 1=Пн … 6=Сб */
-function alignToWeekdayInSameWeek(selectedDate, weekday1to6) {
-  const mon = getMondayOfWeek(selectedDate);
-  const out = new Date(mon);
-  out.setDate(mon.getDate() + (weekday1to6 - 1));
-  return out;
-}
-
-function formatLongRussianDate(d) {
-  return d.toLocaleDateString("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  });
-}
-
-function escapeAttr(s) {
-  return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-}
-
-function isSameCalendarDay(d1, d2) {
-  return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
-  );
-}
-
-function lessonCabinetForStudent(lesson) {
-  if (lesson.cabinet != null && String(lesson.cabinet).trim() !== "") return lesson.cabinet;
-  const g = currentState.studentGroup;
-  if (g && lesson.cabinetsByGroup && lesson.cabinetsByGroup[g] != null && String(lesson.cabinetsByGroup[g]).trim() !== "") {
-    return lesson.cabinetsByGroup[g];
-  }
-  return "—";
-}
-
-const DEFAULT_TIMES = {
-  weekday: {
-    1: { start: "08:15", end: "08:55" },
-    2: { start: "09:05", end: "09:45" },
-    3: { start: "09:55", end: "10:35" },
-    4: { start: "10:45", end: "11:25" },
-    5: { start: "11:45", end: "12:25" },
-    6: { start: "13:15", end: "13:55" },
-    7: { start: "14:00", end: "14:40" },
-    8: { start: "14:45", end: "15:25" }
-  },
-  saturday: {
-    1: { start: "09:00", end: "09:40" },
-    2: { start: "09:45", end: "10:25" },
-    3: { start: "10:35", end: "11:15" },
-    4: { start: "11:30", end: "12:10" },
-    5: { start: "12:15", end: "12:55" },
-    6: { start: "13:00", end: "13:40" },
-    7: { start: "13:45", end: "14:25" },
-    8: { start: "14:30", end: "15:10" }
-  },
-  bigBreak: { start: "12:25", end: "13:15" },
-  ninthDefault: { start: "15:30", end: "16:10" }
-};
-
-let currentState = {
-  isAdmin: false,
-  studentClass: null,
-  studentGroup: "",
-  studentProfile: "",
-  dayView: "today",
-  currentScreen: "schedule",
-  selectedDay: new Date().getDay() || 1,
-  scheduleViewDate: formatDateForInput(new Date()),
-  adminScheduleDate: formatDateForInput(new Date()),
-  adminSelectedDay: 1,
-  grades: [],
-  timetables: {},
-  profiles: [...PROFILES],
-  remoteClasses: {}
-};
-
-// ============ ИНИЦИАЛИЗАЦИЯ ============
-document.addEventListener("DOMContentLoaded", async () => {
-  loadTheme();
-  await loadDataFromSupabase();
-  await initAuthState();
-  generateClassOptions();
-  updateDateTime();
-  setInterval(updateDateTime, 1000);
-  setInterval(updateLessonProgress, 30000);
-  
-  // Дата просмотра расписания (сегодня / завтра из настроек)
-  let base = new Date();
-  if (currentState.dayView === "tomorrow") base.setDate(base.getDate() + 1);
-  if (base.getDay() === 0) base.setDate(base.getDate() + 1);
-  currentState.scheduleViewDate = formatDateForInput(base);
-  const sd = document.getElementById("scheduleDateInput");
-  if (sd) sd.value = currentState.scheduleViewDate;
-  const dow = parseISODate(currentState.scheduleViewDate).getDay();
-  currentState.selectedDay = dow === 0 ? 1 : dow;
-  syncScheduleDayButtons();
-
-  const todayDow = new Date().getDay();
-  if (todayDow !== 0) {
-    currentState.adminSelectedDay = todayDow;
-    currentState.adminScheduleDate = formatDateForInput(alignToWeekdayInSameWeek(new Date(), todayDow));
-    const ad = document.getElementById("adminScheduleDateInput");
-    if (ad) ad.value = currentState.adminScheduleDate;
-  } else {
-    currentState.adminSelectedDay = 1;
-    currentState.adminScheduleDate = formatDateForInput(alignToWeekdayInSameWeek(new Date(), 1));
-    const ad = document.getElementById("adminScheduleDateInput");
-    if (ad) ad.value = currentState.adminScheduleDate;
-  }
-});
-
-// ============ ТЕМА ============
-const THEME_ICONS = {
-  light: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8" fill="none"/><line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
-  dark: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-};
-
-function updateThemeIcon(theme) {
-  document.getElementById("themeIcon").innerHTML = THEME_ICONS[theme] || THEME_ICONS.light;
-}
-
-function loadTheme() {
-  const theme = localStorage.getItem(STORAGE_KEYS.THEME) || "light";
-  document.body.dataset.theme = theme;
-  document.getElementById("themeSwitch").classList.toggle("on", theme === "dark");
-  updateThemeIcon(theme);
-}
-
-function toggleTheme() {
-  const current = document.body.dataset.theme;
-  const next = current === "light" ? "dark" : "light";
-  document.body.dataset.theme = next;
-  localStorage.setItem(STORAGE_KEYS.THEME, next);
-  document.getElementById("themeSwitch").classList.toggle("on", next === "dark");
-  updateThemeIcon(next);
-}
-
-// ============ НАВИГАЦИЯ ============
-function enterAsStudent() {
-  document.getElementById("startScreen").style.display = "none";
-  document.getElementById("appContainer").style.display = "flex";
-  
-  const sdi = document.getElementById("scheduleDateInput");
-  if (sdi && !sdi.value) sdi.value = currentState.scheduleViewDate;
-
-  if (!currentState.studentClass) {
-    showScreen("settings");
-  } else {
-    showScreen("schedule");
-    renderTimetable();
-  }
-}
-
-function showScreen(screenName) {
-  if (screenName === "admin" && !currentState.isAdmin) {
-    return;
-  }
-
-  // Скрыть все экраны
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.querySelectorAll(".nav-item, .bottom-nav-item").forEach(n => n.classList.remove("active"));
-  
-  // Показать нужный
-  document.getElementById(screenName + "Screen").classList.add("active");
-  document.querySelectorAll(`[data-nav="${screenName}"]`).forEach(n => n.classList.add("active"));
-  
-  currentState.currentScreen = screenName;
-  
-  if (screenName === "schedule") {
-    const sdi = document.getElementById("scheduleDateInput");
-    if (sdi && !sdi.value) sdi.value = currentState.scheduleViewDate;
-    renderTimetable();
-  } else if (screenName === "admin") {
-    initAdminPanel();
-  }
-}
-
-// ============ ГЕНЕРАЦИЯ КЛАССОВ ============
-function generateClassOptions() {
-  const classes = [];
-  for (let grade = 5; grade <= 11; grade++) {
-    if (grade === 9) {
-      classes.push("9А", "9Б", "9В");
-    } else {
-      classes.push(grade + "А", grade + "Б");
-    }
-  }
-  
-  const settingsSelect = document.getElementById("settingsClass");
-  const adminSelect = document.getElementById("adminClassSelect");
-  
-  classes.forEach(c => {
-    settingsSelect.innerHTML += `<option value="${c}">${c}</option>`;
-    adminSelect.innerHTML += `<option value="${c}">${c}</option>`;
-  });
-  
-  // Восстановить сохранённые настройки
-  if (currentState.studentClass) {
-    settingsSelect.value = currentState.studentClass;
-    onClassChange();
-    setTimeout(() => {
-      document.getElementById("settingsMathGroup").value = currentState.studentGroup;
-      document.getElementById("settingsProfile").value = currentState.studentProfile;
-      document.getElementById("settingsDayView").value = currentState.dayView;
-    }, 0);
-  }
-}
-
-function getGradeFromClass(className) {
-  return parseInt(className.match(/\d+/)[0]);
-}
-
-function getMathGroupCountForClass(className) {
-  if (!className) return 0;
-  const grade = getGradeFromClass(className);
-  if (grade < 7 || grade > 11) return 0;
-  return grade === 9 ? 3 : 2;
-}
-
-function onClassChange() {
-  const className = document.getElementById("settingsClass").value;
-  const grade = getGradeFromClass(className);
-  const mathGroupSelect = document.getElementById("settingsMathGroup");
-  const profileSelect = document.getElementById("settingsProfile");
-  
-  // Группы математики
-  mathGroupSelect.innerHTML = '<option value="">Без группы</option>';
-  if (grade >= 7 && grade <= 11) {
-    mathGroupSelect.disabled = false;
-    const groups = grade === 9 ? 3 : 2;
-    for (let i = 1; i <= groups; i++) {
-      mathGroupSelect.innerHTML += `<option value="${i}">Группа ${i}</option>`;
-    }
-  } else {
-    mathGroupSelect.disabled = true;
-  }
-  
-  // Профили
-  profileSelect.innerHTML = '<option value="">Без профиля</option>';
-  if (grade >= 9 && grade <= 11) {
-    profileSelect.disabled = false;
-    currentState.profiles.forEach(p => {
-      profileSelect.innerHTML += `<option value="${p}">${p}</option>`;
-    });
-  } else {
-    profileSelect.disabled = true;
-  }
-}
-
-function saveStudentSettings() {
-  const className = document.getElementById("settingsClass").value;
-  if (!className) {
-    alert("Пожалуйста, выберите класс");
-    return;
-  }
-  
-  currentState.studentClass = className;
-  currentState.studentGroup = document.getElementById("settingsMathGroup").value;
-  currentState.studentProfile = document.getElementById("settingsProfile").value;
-  currentState.dayView = document.getElementById("settingsDayView").value;
-  
-  let base = new Date();
-  if (currentState.dayView === "tomorrow") base.setDate(base.getDate() + 1);
-  if (base.getDay() === 0) base.setDate(base.getDate() + 1);
-  currentState.scheduleViewDate = formatDateForInput(base);
-  const sdi = document.getElementById("scheduleDateInput");
-  if (sdi) sdi.value = currentState.scheduleViewDate;
-  syncScheduleDayButtons();
-
-  localStorage.setItem(STORAGE_KEYS.STUDENT, JSON.stringify({
-    class: currentState.studentClass,
-    group: currentState.studentGroup,
-    profile: currentState.studentProfile,
-    dayView: currentState.dayView
-  }));
-  
-  // Показать скрытые пункты меню
-  document.getElementById("calcNavItem").style.display = "flex";
-  document.getElementById("settingsNavItem").style.display = "flex";
-  document.getElementById("calcBottomItem").style.display = "flex";
-  document.getElementById("settingsBottomItem").style.display = "flex";
-  
-  showScreen("schedule");
-  renderTimetable();
-}
-
-// ============ РАСПИСАНИЕ ============
-function syncScheduleDayButtons() {
-  const d = parseISODate(currentState.scheduleViewDate);
-  const dow = d.getDay();
-  const day = dow === 0 ? 1 : dow;
-  document.querySelectorAll("#daySelector .day-btn").forEach((btn, i) => {
-    btn.classList.toggle("active", i + 1 === day);
-  });
-}
-
-function onScheduleDateChange(e) {
-  let v = e.target.value;
-  if (!v) return;
-  let d = parseISODate(v);
-  if (d.getDay() === 0) {
-    d.setDate(d.getDate() + 1);
-    v = formatDateForInput(d);
-    e.target.value = v;
-  }
-  currentState.scheduleViewDate = v;
-  const dow = parseISODate(v).getDay();
-  currentState.selectedDay = dow === 0 ? 1 : dow;
-  syncScheduleDayButtons();
-  renderTimetable();
-}
-
-function selectDay(day) {
-  if (day === 0) return;
-  currentState.scheduleViewDate = formatDateForInput(alignToWeekdayInSameWeek(parseISODate(currentState.scheduleViewDate), day));
-  currentState.selectedDay = day;
-  const inp = document.getElementById("scheduleDateInput");
-  if (inp) inp.value = currentState.scheduleViewDate;
-  syncScheduleDayButtons();
-  renderTimetable();
-}
-
-function getTargetDate() {
-  const now = new Date();
-  if (currentState.dayView === "tomorrow") {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
-  }
-  return now;
-}
-
-function renderTimetable() {
-  if (!currentState.studentClass) {
-    document.getElementById("timetableGrid").innerHTML = `
-      <div style="padding: 80px; text-align: center; color: var(--muted); font-size: 16px;">
-        <span class="empty-state-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="10" y1="9" x2="8" y2="9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-        Выберите класс в настройках, чтобы увидеть расписание
-      </div>
-    `;
-    return;
-  }
-  
-  // Проверка домашнего обучения
-  const isRemote = currentState.remoteClasses[currentState.studentClass];
-  const banner = document.getElementById("remoteLearningBanner");
-  if (isRemote) {
-    banner.classList.remove("hidden");
-    document.getElementById("timetableGrid").innerHTML = "";
-    return;
-  } else {
-    banner.classList.add("hidden");
-  }
-  
-  const viewDate = parseISODate(currentState.scheduleViewDate);
-  const dayOfWeek = viewDate.getDay();
-  if (dayOfWeek === 0) {
-    document.getElementById("scheduleTitle").textContent = "Воскресенье — выходной";
-    document.getElementById("scheduleSubtitle").textContent = formatLongRussianDate(viewDate);
-    document.getElementById("timetableGrid").innerHTML = `
-      <div style="padding: 80px; text-align: center; color: var(--muted); font-size: 16px;">
-        <span class="empty-state-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5.5" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3M4.7 4.7l2 2M17.3 17.3l2 2M4.7 19.3l2-2M17.3 6.7l2-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        </span>
-        В этот день занятий нет
-      </div>
-    `;
-    return;
-  }
-
-  const isSaturday = dayOfWeek === 6;
-  
-  // Заголовок
-  let title = currentState.studentClass;
-  if (currentState.studentGroup) title += ` • Матем. группа ${currentState.studentGroup}`;
-  if (currentState.studentProfile) title += ` • ${currentState.studentProfile}`;
-  
-  document.getElementById("scheduleTitle").textContent = `Расписание — ${formatLongRussianDate(viewDate)}`;
-  document.getElementById("scheduleSubtitle").textContent = `${WEEKDAYS[dayOfWeek]} • ${title}`;
-  
-  // Получить расписание
-  const key = `${currentState.studentClass}|${currentState.studentGroup}|${currentState.studentProfile}|${dayOfWeek}`;
-  const timetable = currentState.timetables[key] || { lessons: [] };
-  
-  // Генерация сетки
-  let html = `
-    <div class="lesson-row header">
-      <div class="lesson-cell lesson-index">№</div>
-      <div class="lesson-cell">Предмет</div>
-      <div class="lesson-cell">Время</div>
-      <div class="lesson-cell">Каб.</div>
-      <div class="lesson-cell">Статус</div>
-    </div>
-  `;
-  
-  if (timetable.lessons.length === 0) {
-    html += `
-      <div class="lesson-row">
-        <div class="lesson-cell" style="grid-column: 1/-1; justify-content: center; color: var(--muted); padding: 60px; font-size: 16px;">
-          📭 Расписание для этого дня не заполнено администратором
-        </div>
-      </div>
-    `;
-  } else {
-    const timeConfig = isSaturday ? DEFAULT_TIMES.saturday : DEFAULT_TIMES.weekday;
-    
-    timetable.lessons.forEach((lesson, idx) => {
-      const time = lesson.time || timeConfig[lesson.number] || { start: "--:--", end: "--:--" };
-      const isCurrent = isCurrentLesson(time, dayOfWeek);
-      
-      html += `
-        <div class="lesson-row ${isCurrent ? 'active' : ''}" data-lesson="${idx}" style="${isCurrent ? 'background: var(--accent-soft);' : ''}">
-          <div class="lesson-cell lesson-index">${lesson.number}</div>
-          <div class="lesson-cell lesson-subject">${lesson.subject}</div>
-          <div class="lesson-cell lesson-time">${time.start}–${time.end}</div>
-          <div class="lesson-cell">
-            <span class="lesson-cabinet">${lessonCabinetForStudent(lesson)}</span>
-          </div>
-          <div class="lesson-cell lesson-cell--status">
-            <div class="lesson-status lesson-status-card">
-              <div class="status-text status--idle" id="status-${idx}">Загрузка...</div>
-              <div class="progress-bar">
-                <div class="progress-inner" id="progress-${idx}"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-  }
-  
-  document.getElementById("timetableGrid").innerHTML = html;
-  updateLessonProgress();
-}
-
-function isCurrentLesson(time, dayOfWeek) {
-  const now = new Date();
-  if (!isSameCalendarDay(now, parseISODate(currentState.scheduleViewDate))) return false;
-  if (now.getDay() !== dayOfWeek) return false;
-  
-  const [startH, startM] = time.start.split(":").map(Number);
-  const [endH, endM] = time.end.split(":").map(Number);
-  const current = now.getHours() * 60 + now.getMinutes();
-  const start = startH * 60 + startM;
-  const end = endH * 60 + endM;
-  
-  return current >= start && current <= end;
-}
-
-function setLessonStatus(el, text, className) {
-  if (!el) return;
-  el.textContent = text;
-  el.className = "status-text " + className;
-}
-
-function updateLessonProgress() {
-  const now = new Date();
-  const viewDate = parseISODate(currentState.scheduleViewDate);
-  const isViewingToday = isSameCalendarDay(now, viewDate);
-
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const viewMidnight = new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate());
-  const isPastDay = viewMidnight < todayMidnight;
-
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  document.querySelectorAll("[data-lesson]").forEach(row => {
-    const idx = row.dataset.lesson;
-    const statusEl = document.getElementById(`status-${idx}`);
-    const progressEl = document.getElementById(`progress-${idx}`);
-    if (!statusEl || !progressEl) return;
-
-    const timeText = row.querySelector(".lesson-time")?.textContent || "";
-    const parts = timeText.split("–");
-    const start = parts[0]?.trim();
-    const end = parts[1]?.trim();
-    if (!start || !end || start.includes("-") || end.includes("-")) {
-      setLessonStatus(statusEl, "—", "status--idle");
-      progressEl.style.width = "0%";
-      return;
-    }
-
-    const [startH, startM] = start.split(":").map(Number);
-    const [endH, endM] = end.split(":").map(Number);
-    if (Number.isNaN(startH) || Number.isNaN(endH)) {
-      setLessonStatus(statusEl, "—", "status--idle");
-      progressEl.style.width = "0%";
-      return;
-    }
-
-    const startMinutes = startH * 60 + startM;
-    const endMinutes = endH * 60 + endM;
-    const total = Math.max(1, endMinutes - startMinutes);
-
-    if (!isViewingToday) {
-      if (isPastDay) {
-        setLessonStatus(statusEl, "✓ Завершён", "status--past");
-        progressEl.style.width = "100%";
-      } else {
-        setLessonStatus(statusEl, "⏳ Урок ещё не начался", "status--future");
-        progressEl.style.width = "0%";
-      }
-      return;
-    }
-
-    if (currentMinutes < startMinutes) {
-      const minsToStart = startMinutes - currentMinutes;
-      setLessonStatus(statusEl, `⏳ Начало через ${minsToStart} мин`, "status--pending");
-      progressEl.style.width = "0%";
-    } else if (currentMinutes > endMinutes) {
-      setLessonStatus(statusEl, "✓ Завершён", "status--done");
-      progressEl.style.width = "100%";
-    } else {
-      const passed = currentMinutes - startMinutes;
-      const percent = (passed / total) * 100;
-      const minsLeft = endMinutes - currentMinutes;
-      setLessonStatus(statusEl, `▶ Осталось ${minsLeft} мин`, "status--live");
-      progressEl.style.width = percent + "%";
-    }
-  });
-}
-
-function updateDateTime() {
-  const now = new Date();
-  const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  document.getElementById("currentDateDisplay").textContent = now.toLocaleDateString("ru-RU", options);
-  document.getElementById("currentTimeDisplay").textContent = now.toLocaleTimeString("ru-RU", {hour: '2-digit', minute:'2-digit'});
-}
-
-// ============ КАЛЬКУЛЯТОР ============
-function addGrade() {
-  const value = parseFloat(document.getElementById("calcGrade").value);
-  const weight = parseFloat(document.getElementById("calcWeight").value);
-  
-  if (isNaN(value) || isNaN(weight) || value < 1 || value > 5) {
-    alert("Оценка должна быть от 1 до 5");
-    return;
-  }
-  
-  currentState.grades.push({ value, weight });
-  saveGrades();
-  renderGrades();
-}
-
-function renderGrades() {
-  const list = document.getElementById("gradesList");
-  if (currentState.grades.length === 0) {
-    list.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 40px;">Нет добавленных оценок</p>';
-  } else {
-    list.innerHTML = currentState.grades.map((g, i) => `
-      <div class="grade-item">
-        <div class="grade-info">
-          <div class="grade-value">${g.value}</div>
-          <div>
-            <div style="font-weight: 700; font-size: 16px;">Оценка #${i + 1}</div>
-            <div style="font-size: 14px; color: var(--muted);">Вес: ${g.weight}</div>
-          </div>
-        </div>
-        <button onclick="removeGrade(${i})" class="delete-lesson-btn">
-          <span class="delete-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
-        </button>
-      </div>
-    `).join("");
-  }
-  
-  // Средний балл
-  const totalWeight = currentState.grades.reduce((sum, g) => sum + g.weight, 0);
-  const weightedSum = currentState.grades.reduce((sum, g) => sum + g.value * g.weight, 0);
-  const avg = totalWeight > 0 ? (weightedSum / totalWeight).toFixed(2) : "—";
-  
-  document.getElementById("avgGrade").textContent = avg;
-  document.getElementById("gradesCount").textContent = currentState.grades.length;
-}
-
-function removeGrade(index) {
-  currentState.grades.splice(index, 1);
-  saveGrades();
-  renderGrades();
-}
-
-function resetGrades() {
-  if (confirm("Очистить все оценки?")) {
-    currentState.grades = [];
-    saveGrades();
-    renderGrades();
-  }
-}
-
-function saveGrades() {
-  localStorage.setItem(STORAGE_KEYS.GRADES, JSON.stringify(currentState.grades));
-}
-
-// ============ АДМИНИСТРАТОР ============
-function showAdminLogin() {
-  document.getElementById("adminLoginModal").classList.add("active");
-}
-
-function closeAdminLogin() {
-  document.getElementById("adminLoginModal").classList.remove("active");
-  document.getElementById("adminLoginError").textContent = "";
-}
-
-async function loginAdmin() {
-  const email = document.getElementById("adminLoginInput").value.trim();
-  const password = document.getElementById("adminPasswordInput").value;
-
-  if (!email || !password) {
-    document.getElementById("adminLoginError").textContent = "Введите email и пароль";
-    return;
-  }
-
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error || !data.session) {
-      document.getElementById("adminLoginError").textContent = "❌ Неверный email или пароль";
-      return;
-    }
-
-    currentState.isAdmin = true;
-    closeAdminLogin();
-    document.getElementById("startScreen").style.display = "none";
-    document.getElementById("appContainer").style.display = "flex";
-    showAdminNav();
-    showScreen("admin");
-  } catch (err) {
-    document.getElementById("adminLoginError").textContent = "❌ Ошибка входа. Попробуйте позже.";
-    console.error("Supabase login error:", err);
-  }
-}
-
-function showAdminNav() {
-  document.getElementById("adminNavItem").style.display = "flex";
-  document.getElementById("adminBottomItem").style.display = "flex";
-}
-
-function hideAdminNav() {
-  document.getElementById("adminNavItem").style.display = "none";
-  document.getElementById("adminBottomItem").style.display = "none";
-}
-
-async function logoutAdmin() {
-  currentState.isAdmin = false;
-  await supabase.auth.signOut();
-  hideAdminNav();
-  showScreen("schedule");
-}
-
-async function initAuthState() {
-  try {
-    const { data } = await supabase.auth.getSession();
-    if (data?.session) {
-      currentState.isAdmin = true;
-      showAdminNav();
-    }
-
-    supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        currentState.isAdmin = true;
-        showAdminNav();
-      } else {
-        currentState.isAdmin = false;
-        hideAdminNav();
-      }
-    });
-  } catch (err) {
-    console.error("Ошибка инициализации auth-сессии:", err);
-  }
-}
-
-function updateAdminEditingLabel() {
-  const el = document.getElementById("adminEditingDayLabel");
-  if (!el) return;
-  const d = parseISODate(currentState.adminScheduleDate);
-  const cn = document.getElementById("adminClassSelect")?.value || "";
-  const gp = document.getElementById("adminMathGroupSelect")?.value;
-  const pf = document.getElementById("adminProfileSelect")?.value;
-  let ctx = `Вы заполняете расписание на: <b>${WEEKDAYS[d.getDay()]}</b>, ${d.toLocaleDateString("ru-RU")}`;
-  if (cn) ctx += ` • класс ${escapeAttr(cn)}`;
-  if (gp) ctx += ` • матем. гр. ${escapeAttr(gp)} — кабинеты в таблице ниже для этой группы`;
-  else if (getMathGroupCountForClass(cn) > 0) ctx += ` • матем.: выберите группу выше, чтобы задать кабинеты для неё`;
-  if (pf) ctx += ` • профиль ${escapeAttr(pf)}`;
-  el.innerHTML = ctx;
-}
-
-function onAdminScheduleDateChange(e) {
-  let v = e.target.value;
-  if (!v) return;
-  let d = parseISODate(v);
-  if (d.getDay() === 0) {
-    d.setDate(d.getDate() + 1);
-    v = formatDateForInput(d);
-    e.target.value = v;
-  }
-  currentState.adminScheduleDate = v;
-  const dow = parseISODate(v).getDay();
-  currentState.adminSelectedDay = dow === 0 ? 1 : dow;
-  document.querySelectorAll("#adminScreen .day-btn").forEach((btn, i) => {
-    btn.classList.toggle("active", i + 1 === currentState.adminSelectedDay);
-  });
-  renderAdminLessons();
-}
-
-function onAdminGroupOrProfileChange() {
-  renderAdminLessons();
-}
-
-function initAdminPanel() {
-  renderProfilesList();
-  const ad = document.getElementById("adminScheduleDateInput");
-  if (ad) {
-    if (!ad.value) ad.value = currentState.adminScheduleDate;
-    currentState.adminScheduleDate = ad.value;
-  }
-  const adDate = parseISODate(currentState.adminScheduleDate);
-  currentState.adminSelectedDay = adDate.getDay() === 0 ? 1 : adDate.getDay();
-  document.querySelectorAll("#adminScreen .day-btn").forEach((btn, i) => {
-    btn.classList.toggle("active", i + 1 === currentState.adminSelectedDay);
-  });
-  onAdminClassChange();
-}
-
-function onAdminClassChange() {
-  const className = document.getElementById("adminClassSelect").value;
-  const grade = className ? getGradeFromClass(className) : 0;
-  
-  // Группы математики
-  const mathSelect = document.getElementById("adminMathGroupSelect");
-  mathSelect.innerHTML = '<option value="">Без группы</option>';
-  if (grade >= 7 && grade <= 11) {
-    const groups = grade === 9 ? 3 : 2;
-    for (let i = 1; i <= groups; i++) {
-      mathSelect.innerHTML += `<option value="${i}">Группа ${i}</option>`;
-    }
-  }
-  
-  // Профили
-  const profileSelect = document.getElementById("adminProfileSelect");
-  profileSelect.innerHTML = '<option value="">Без профиля</option>';
-  if (grade >= 9 && grade <= 11) {
-    currentState.profiles.forEach(p => {
-      profileSelect.innerHTML += `<option value="${p}">${p}</option>`;
-    });
-  }
-  
-  // Проверка домашнего обучения
-  document.getElementById("remoteLearningCheck").checked = !!currentState.remoteClasses[className];
-  
-  renderAdminLessons();
-}
-
-function selectAdminDay(day) {
-  if (day === 0) return;
-  currentState.adminSelectedDay = day;
-  currentState.adminScheduleDate = formatDateForInput(
-    alignToWeekdayInSameWeek(parseISODate(currentState.adminScheduleDate), day)
-  );
-  const inp = document.getElementById("adminScheduleDateInput");
-  if (inp) inp.value = currentState.adminScheduleDate;
-  document.querySelectorAll("#adminScreen .day-btn").forEach((btn, i) => {
-    btn.classList.toggle("active", i + 1 === day);
-  });
-  renderAdminLessons();
-}
-
-function renderAdminLessons() {
-  const className = document.getElementById("adminClassSelect").value;
-  const container = document.getElementById("adminLessonsEditor");
-  
-  if (!className) {
-    container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 60px; font-size: 16px;">Выберите класс</p>';
-    return;
-  }
-  
-  const group = document.getElementById("adminMathGroupSelect").value;
-  const profile = document.getElementById("adminProfileSelect").value;
-  const dView = parseISODate(currentState.adminScheduleDate);
-  let day = dView.getDay();
-  if (day === 0) day = 1;
-  currentState.adminSelectedDay = day;
-  
-  const isSaturday = day === 6;
-  
-  const key = `${className}|${group}|${profile}|${day}`;
-  let timetable = currentState.timetables[key] || { lessons: [] };
-  
-  document.getElementById("bigBreakLessonCheck").checked = timetable.hasBigBreakLesson || false;
-  document.getElementById("ninthLessonCheck").checked = timetable.hasNinthLesson || false;
-  document.getElementById("ninthLessonTimeSettings").classList.toggle("hidden", !timetable.hasNinthLesson);
-  
-  if (timetable.ninthTime) {
-    const [startH, startM] = timetable.ninthTime.start.split(":");
-    const [endH, endM] = timetable.ninthTime.end.split(":");
-    document.getElementById("ninthStartH").value = startH;
-    document.getElementById("ninthStartM").value = startM;
-    document.getElementById("ninthEndH").value = endH;
-    document.getElementById("ninthEndM").value = endM;
-  }
-  
-  if (timetable.lessons.length === 0) {
-    const timeConfig = isSaturday ? DEFAULT_TIMES.saturday : DEFAULT_TIMES.weekday;
-    for (let i = 1; i <= 8; i++) {
-      timetable.lessons.push({
-        number: i,
-        subject: "",
-        cabinet: "",
-        time: timeConfig[i]
-      });
-    }
-    currentState.timetables[key] = timetable;
-  }
-  
-  container.innerHTML = timetable.lessons.map((lesson, idx) => `
-    <div class="lesson-editor-row">
-      <div style="font-weight: 800; color: var(--accent); font-size: 18px;">${lesson.number}</div>
-      <input type="text" class="lesson-subj-input" placeholder="Название предмета" value="${escapeAttr(lesson.subject)}" />
-      <select class="lesson-cab-single" id="lesson-cab-${idx}">
-        <option value="">Каб.</option>
-        ${generateCabinetOptions(lesson.cabinet)}
-      </select>
-      <input type="text" class="lesson-start-input" placeholder="08:00" value="${escapeAttr(lesson.time?.start || "")}" />
-      <input type="text" class="lesson-end-input" placeholder="08:45" value="${escapeAttr(lesson.time?.end || "")}" />
-      <button type="button" class="delete-lesson-btn" onclick="removeAdminLesson(this)">
-        <span class="delete-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
-      </button>
-    </div>
-  `).join("");
-  
-  updateAdminEditingLabel();
-}
-
-function generateCabinetOptions(selected) {
-  let html = "";
-  for (let i = 1; i <= 23; i++) {
-    html += `<option value="${i}" ${String(selected) === String(i) ? "selected" : ""}>${i}</option>`;
-  }
-  return html;
-}
-
-function addNewLesson() {
-  const container = document.getElementById("adminLessonsEditor");
-  const rows = container.querySelectorAll(".lesson-editor-row");
-  const nextNum = rows.length + 1;
-  
-  const newRow = document.createElement("div");
-  newRow.className = "lesson-editor-row";
-  newRow.innerHTML = `
-    <div style="font-weight: 800; color: var(--accent); font-size: 18px;">${nextNum}</div>
-    <input type="text" class="lesson-subj-input" placeholder="Название предмета" />
-    <select class="lesson-cab-single" id="lesson-cab-${rows.length}">
-      <option value="">Каб.</option>
-      ${generateCabinetOptions("")}
-    </select>
-    <input type="text" class="lesson-start-input" placeholder="15:30" value="15:30" />
-    <input type="text" class="lesson-end-input" placeholder="16:10" value="16:10" />
-    <button type="button" class="delete-lesson-btn" onclick="removeAdminLesson(this)">
-      <span class="delete-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 7h12M9 7V5h6v2M8 7v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg></span>
-    </button>
-  `;
-  container.appendChild(newRow);
-}
-
-function removeAdminLesson(btn) {
-  const row = btn.closest(".lesson-editor-row");
-  if (!row) return;
-  row.remove();
-  document.querySelectorAll("#adminLessonsEditor .lesson-editor-row").forEach((r, i) => {
-    const num = r.querySelector("div");
-    if (num) num.textContent = i + 1;
-  });
-}
-
-function clearAllLessons() {
-  if (confirm("Удалить все уроки для этого дня?")) {
-    document.getElementById("adminLessonsEditor").innerHTML = "";
-  }
-}
-
-function toggleBigBreakLesson() {
-  // Логика сохраняется при сохранении расписания
-}
-
-function toggleNinthLesson() {
-  const checked = document.getElementById("ninthLessonCheck").checked;
-  document.getElementById("ninthLessonTimeSettings").classList.toggle("hidden", !checked);
-}
-
-function toggleRemoteLearning() {
-  const className = document.getElementById("adminClassSelect").value;
-  if (document.getElementById("remoteLearningCheck").checked) {
-    currentState.remoteClasses[className] = true;
-    localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(currentState.remoteClasses));
-    saveRemoteClassToSupabase(className);
-  } else {
-    delete currentState.remoteClasses[className];
-    localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(currentState.remoteClasses));
-    removeRemoteClassFromSupabase(className);
-  }
-}
-
-function renderProfilesList() {
-  const container = document.getElementById("profilesList");
-  container.innerHTML = currentState.profiles.map((p, i) => `
-    <span style="background: var(--accent-soft); color: var(--accent); padding: 10px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border);">
-      ${p}
-      <button onclick="removeProfile(${i})" style="background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.6;">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </button>
-    </span>
-  `).join("");
-}
-
-function addProfile() {
-  const name = document.getElementById("newProfileName").value.trim();
-  if (name && !currentState.profiles.includes(name)) {
-    currentState.profiles.push(name);
-    localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentState.profiles));
-    document.getElementById("newProfileName").value = "";
-    renderProfilesList();
-    onAdminClassChange();
-    
-    // Сохранить в Supabase
-    saveProfileToSupabase(name);
-  } else if (currentState.profiles.includes(name)) {
-    alert("Такой профиль уже существует");
-  }
-}
-
-function removeProfile(idx) {
-  if (confirm(`Удалить профиль "${currentState.profiles[idx]}"?`)) {
-    const profileName = currentState.profiles[idx];
-    currentState.profiles.splice(idx, 1);
-    localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentState.profiles));
-    renderProfilesList();
-    onAdminClassChange();
-    
-    // Удалить из Supabase
-    deleteProfileFromSupabase(profileName);
-  }
-}
-
-async function saveAdminTimetable() {
-  const className = document.getElementById("adminClassSelect").value;
-  if (!className) {
-    alert("Выберите класс");
-    return;
-  }
-  
-  const group = document.getElementById("adminMathGroupSelect").value;
-  const profile = document.getElementById("adminProfileSelect").value;
-  const dView = parseISODate(currentState.adminScheduleDate);
-  let day = dView.getDay();
-  if (day === 0) day = 1;
-  currentState.adminSelectedDay = day;
-  
-  const lessons = [];
-  const rows = document.querySelectorAll("#adminLessonsEditor .lesson-editor-row");
-  
-  rows.forEach((row, idx) => {
-    const subject = row.querySelector(".lesson-subj-input")?.value?.trim() || "";
-    if (!subject) return;
-    
-    const cabinet = row.querySelector(".lesson-cab-single")?.value || "";
-    const start = row.querySelector(".lesson-start-input")?.value?.trim() || "";
-    const end = row.querySelector(".lesson-end-input")?.value?.trim() || "";
-    
-    lessons.push({
-      number: idx + 1,
-      subject,
-      cabinet,
-      time: { start, end }
-    });
-  });
-  
-  const key = `${className}|${group}|${profile}|${day}`;
-  currentState.timetables[key] = {
-    lessons,
-    hasBigBreakLesson: document.getElementById("bigBreakLessonCheck").checked,
-    hasNinthLesson: document.getElementById("ninthLessonCheck").checked,
-    ninthTime: document.getElementById("ninthLessonCheck").checked ? {
-      start: `${document.getElementById("ninthStartH").value}:${String(document.getElementById("ninthStartM").value).padStart(2, "0")}`,
-      end: `${document.getElementById("ninthEndH").value}:${String(document.getElementById("ninthEndM").value).padStart(2, "0")}`
-    } : null
-  };
-  
-  localStorage.setItem(STORAGE_KEYS.TIMETABLES, JSON.stringify(currentState.timetables));
-  
-  await syncCurrentProfileWeekToSupabase(className, group, profile);
-  
-  const status = document.getElementById("adminSaveStatus");
-  status.innerHTML = "✅ <b>Сохранено: этот день и вся неделя этого класса/профиля в облаке</b>";
-  status.style.color = "var(--success)";
-  setTimeout(() => status.innerHTML = "", 5000);
-}
-
-// ============ ЗАГРУЗКА/СОХРАНЕНИЕ ============
-async function loadDataFromSupabase() {
-  if (!supabase) {
-    console.log("Supabase не инициализирован");
-    loadDataFromLocalStorage();
-    return;
-  }
-  
-  // Загрузить расписание из Supabase
-  try {
-    const { data, error } = await supabase
-      .from('timetables')
-      .select('*');
-    
-    if (error) {
-      console.log("Ошибка загрузки расписания из Supabase:", error);
-      loadDataFromLocalStorage();
-      return;
-    }
-    
-    if (data && data.length > 0) {
-      data.forEach(item => {
-        currentState.timetables[item.key] = item.data;
-      });
-      localStorage.setItem(STORAGE_KEYS.TIMETABLES, JSON.stringify(currentState.timetables));
-      console.log("✅ Расписание загружено из Supabase");
-    }
-  } catch (err) {
-    console.log("Ошибка подключения к Supabase расписания:", err);
-    loadDataFromLocalStorage();
-    return;
-  }
-  
-  // Загрузить профили
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*');
-    
-    if (error) throw error;
-    
-    if (data && data.length > 0) {
-      currentState.profiles = data.map(p => p.name);
-      PROFILES = currentState.profiles;
-      localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentState.profiles));
-      console.log("✅ Профили загружены из Supabase");
-    }
-  } catch (err) {
-    console.log("Ошибка загрузки профилей:", err);
-    // Используем локальные профили
-    const profiles = localStorage.getItem(STORAGE_KEYS.PROFILES);
-    if (profiles) {
-      currentState.profiles = JSON.parse(profiles);
-      PROFILES = currentState.profiles;
-    }
-  }
-  
-  // Загрузить конфигурацию домашнего обучения
-  try {
-    const { data, error } = await supabase
-      .from('remote_classes')
-      .select('class_name');
-    
-    if (error) throw error;
-    
-    if (data && data.length > 0) {
-      const remoteData = {};
-      data.forEach(item => {
-        remoteData[item.class_name] = true;
-      });
-      currentState.remoteClasses = remoteData;
-      localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(currentState.remoteClasses));
-      console.log("✅ Данные домашнего обучения загружены из Supabase");
-    }
-  } catch (err) {
-    console.log("Ошибка загрузки данных домашнего обучения:", err);
-    const remote = localStorage.getItem(STORAGE_KEYS.REMOTE);
-    if (remote) currentState.remoteClasses = JSON.parse(remote);
-  }
-  
-  // Загрузить студенческие данные из локального хранилища (они не хранятся в облаке)
-  const student = localStorage.getItem(STORAGE_KEYS.STUDENT);
-  if (student) {
-    const s = JSON.parse(student);
-    currentState.studentClass = s.class;
-    currentState.studentGroup = s.group;
-    currentState.studentProfile = s.profile;
-    currentState.dayView = s.dayView || "today";
-    
-    // Показать меню
-    document.getElementById("calcNavItem").style.display = "flex";
-    document.getElementById("settingsNavItem").style.display = "flex";
-    document.getElementById("calcBottomItem").style.display = "flex";
-    document.getElementById("settingsBottomItem").style.display = "flex";
-  }
-  
-  // Оценки загружаются из локального хранилища
-  const grades = localStorage.getItem(STORAGE_KEYS.GRADES);
-  if (grades) currentState.grades = JSON.parse(grades);
-}
-
-function loadDataFromLocalStorage() {
-  // Студент
-  const student = localStorage.getItem(STORAGE_KEYS.STUDENT);
-  if (student) {
-    const s = JSON.parse(student);
-    currentState.studentClass = s.class;
-    currentState.studentGroup = s.group;
-    currentState.studentProfile = s.profile;
-    currentState.dayView = s.dayView || "today";
-    
-    // Показать меню
-    document.getElementById("calcNavItem").style.display = "flex";
-    document.getElementById("settingsNavItem").style.display = "flex";
-    document.getElementById("calcBottomItem").style.display = "flex";
-    document.getElementById("settingsBottomItem").style.display = "flex";
-  }
-  
-  // Оценки
-  const grades = localStorage.getItem(STORAGE_KEYS.GRADES);
-  if (grades) currentState.grades = JSON.parse(grades);
-  
-  // Расписания
-  const timetables = localStorage.getItem(STORAGE_KEYS.TIMETABLES);
-  if (timetables) currentState.timetables = JSON.parse(timetables);
-  
-  // Профили
-  const profiles = localStorage.getItem(STORAGE_KEYS.PROFILES);
-  if (profiles) {
-    currentState.profiles = JSON.parse(profiles);
-    PROFILES = currentState.profiles;
-  }
-  
-  // Домашнее обучение
-  const remote = localStorage.getItem(STORAGE_KEYS.REMOTE);
-  if (remote) currentState.remoteClasses = JSON.parse(remote);
-}
-
-async function saveToSupabase(key, data) {
-  if (!supabase) return console.log("Supabase не инициализирован");
-  
-  try {
-    // Проверить, существует ли уже эта запись
-    const { data: existing, error: checkError } = await supabase
-      .from('timetables')
-      .select('id')
-      .eq('key', key)
-      .maybeSingle();
-    
-    if (existing) {
-      // Обновить существующую запись
-      const { error: updateError } = await supabase
-        .from('timetables')
-        .update({ data })
-        .eq('key', key);
-      
-      if (updateError) throw updateError;
-    } else {
-      // Вставить новую запись
-      const { error: insertError } = await supabase
-        .from('timetables')
-        .insert([{ key, data }]);
-      
-      if (insertError) throw insertError;
-    }
-    
-    console.log("✅ Расписание сохранено в Supabase");
-  } catch (err) {
-    console.log("❌ Ошибка при сохранении в Supabase:", err);
-  }
-}
-
-async function syncCurrentProfileWeekToSupabase(className, group, profile) {
-  if (!supabase) return;
-  for (let d = 1; d <= 6; d++) {
-    const key = `${className}|${group}|${profile}|${d}`;
-    if (currentState.timetables[key]) {
-      await saveToSupabase(key, currentState.timetables[key]);
-    }
-  }
-}
-
-async function saveProfileToSupabase(name) {
-  if (!supabase) return console.log("Supabase не инициализирован");
-  
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .insert([{ name }]);
-    
-    if (error && error.code !== "23505") throw error; // 23505 = UNIQUE violation
-    console.log("✅ Профиль сохранён в Supabase");
-  } catch (err) {
-    console.log("⚠️ Профиль может уже существовать или ошибка:", err);
-  }
-}
-
-async function deleteProfileFromSupabase(name) {
-  if (!supabase) return console.log("Supabase не инициализирован");
-  
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('name', name);
-    
-    if (error) throw error;
-    console.log("✅ Профиль удалён из Supabase");
-  } catch (err) {
-    console.log("❌ Ошибка при удалении профиля:", err);
-  }
-}
-
-async function saveRemoteClassToSupabase(className) {
-  if (!supabase) return console.log("Supabase не инициализирован");
-  
-  try {
-    const { error } = await supabase
-      .from('remote_classes')
-      .insert([{ class_name: className }]);
-    
-    if (error && error.code !== "23505") throw error;
-    console.log("✅ Класс добавлен в список домашнего обучения");
-  } catch (err) {
-    console.log("⚠️ Класс может быть уже добавлен или ошибка:", err);
-  }
-}
-
-async function removeRemoteClassFromSupabase(className) {
-  if (!supabase) return console.log("Supabase не инициализирован");
-  
-  try {
-    const { error } = await supabase
-      .from('remote_classes')
-      .delete()
-      .eq('class_name', className);
-    
-    if (error) throw error;
-    console.log("✅ Класс удалён из списка домашнего обучения");
-  } catch (err) {
-    console.log("❌ Ошибка при удалении класса:", err);
-  }
-}
-
-function loadData() {
-  loadDataFromLocalStorage();
-}
-
-function installBrowserProtection() {
-  document.addEventListener("contextmenu", event => event.preventDefault());
-  document.addEventListener("keydown", event => {
-    const key = event.key.toUpperCase();
-    if (
-      key === "F12" ||
-      (event.ctrlKey && event.shiftKey && ["I", "J", "C"].includes(key)) ||
-      (event.ctrlKey && key === "U") ||
-      (event.ctrlKey && key === "S") ||
-      (event.ctrlKey && key === "F")
-    ) {
-      event.preventDefault();
-      event.stopPropagation();
-      return false;
-    }
-  });
-  document.body.addEventListener("mousedown", event => {
-    if (event.button === 2) event.preventDefault();
-  });
-}
-
-installBrowserProtection();
-</script>
+<script src="app.js" defer></script>
 </body>
 </html>
