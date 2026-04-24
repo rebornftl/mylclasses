@@ -26,6 +26,7 @@ function withTimeout(promise, ms, label) {
 const STORAGE_KEYS = {
   THEME: "tu_theme",
   WALLPAPER: "tu_wallpaper",
+  VIDEO_WALLPAPER_PAUSED: "tu_video_wallpaper_paused",
   GLASS_STRENGTH: "tu_glass_strength",
   STUDENT: "tu_student",
   GRADES: "tu_grades",
@@ -71,7 +72,9 @@ function runStorageMigrations() {
 
 // ============ ДАННЫЕ ============
 const WEEKDAYS = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
-let PROFILES = ["ФМИ", "ИМ", "ФХ", "ЕН", "СЭ"];
+// Набор профилей по умолчанию — используется только для первой инициализации,
+// если в localStorage и Supabase пусто. Всё остальное — через state.data.profiles.
+const DEFAULT_PROFILES = ["ФМИ", "ИМ", "ФХ", "ЕН", "СЭ"];
 
 function formatDateForInput(d) {
   const x = new Date(d);
@@ -195,7 +198,7 @@ const state = {
   data: {
     grades: [],
     timetables: {},
-    profiles: [...PROFILES],
+    profiles: [...DEFAULT_PROFILES],
     remoteClasses: {}
   }
 };
@@ -204,23 +207,43 @@ const state = {
 // Id таймеров, чтобы можно было их отменить (hot reload / page hide).
 let _dateTimer = null;
 let _progressTimer = null;
+// Дата/время показывается без секунд, поэтому раз в секунду — излишне.
+// 20 сек — компромисс: прогресс-бар урока обновляется отдельным таймером,
+// а заголовок «сейчас такой-то день» всё равно не меняется чаще раза в день.
+const DATE_TIMER_INTERVAL_MS = 20_000;
+const PROGRESS_TIMER_INTERVAL_MS = 30_000;
+function startUiTimers() {
+  stopUiTimers();
+  _dateTimer = setInterval(updateDateTime, DATE_TIMER_INTERVAL_MS);
+  _progressTimer = setInterval(updateLessonProgress, PROGRESS_TIMER_INTERVAL_MS);
+}
+function stopUiTimers() {
+  if (_dateTimer) { clearInterval(_dateTimer); _dateTimer = null; }
+  if (_progressTimer) { clearInterval(_progressTimer); _progressTimer = null; }
+}
+// Экономим CPU, когда вкладка не видна: таймеры не нужны, пока пользователь
+// не смотрит на экран. При возвращении — сразу обновляем и заводим снова.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopUiTimers();
+  } else {
+    updateDateTime();
+    updateLessonProgress();
+    startUiTimers();
+  }
+});
 window.addEventListener("beforeunload", () => {
-  if (_dateTimer) clearInterval(_dateTimer);
-  if (_progressTimer) clearInterval(_progressTimer);
+  stopUiTimers();
   if (_realtimeChannel && supabase?.removeChannel) supabase.removeChannel(_realtimeChannel);
 });
 
 // A11y: кликабельные div-ы навигации должны быть доступны с клавиатуры и скринридеров.
+// Keydown-обработка Enter/Space сама по себе уже реализована в installEventDelegation()
+// через глобальный keydown на [data-action]; здесь только выставляем role и tabindex.
 function enhanceNavA11y() {
   document.querySelectorAll(".nav-item, .bottom-nav-item").forEach(el => {
     if (!el.hasAttribute("role")) el.setAttribute("role", "button");
     if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
-    el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        el.click();
-      }
-    });
   });
 }
 
@@ -237,6 +260,8 @@ const CLICK_ACTIONS = {
   saveStudentSettings: () => saveStudentSettings(),
   toggleThemeCollapsible: () => toggleThemeCollapsible(),
   clearWallpaper: () => clearWallpaper(),
+  clearVideoWallpaper: () => clearVideoWallpaper(),
+  toggleVideoWallpaperPause: () => toggleVideoWallpaperPause(),
   addGrade: () => addGrade(),
   resetGrades: () => resetGrades(),
   logoutAdmin: () => logoutAdmin(),
@@ -259,6 +284,7 @@ const CHANGE_ACTIONS = {
   toggleRemoteLearning: (el, e) => toggleRemoteLearning(e),
   toggleNinthLesson: (el, e) => toggleNinthLesson(e),
   onWallpaperFile: (el, e) => onWallpaperFile(e),
+  onVideoWallpaperFile: (el, e) => onVideoWallpaperFile(e),
   onScheduleDateChange: (el, e) => onScheduleDateChange(e),
   onAdminScheduleDateChange: (el, e) => onAdminScheduleDateChange(e)
 };
@@ -324,8 +350,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initAuthState().catch(err => debug("initAuthState failed:", err));
 
   updateDateTime();
-  _dateTimer = setInterval(updateDateTime, 1000);
-  _progressTimer = setInterval(updateLessonProgress, 30000);
+  startUiTimers();
   
   // Дата просмотра расписания (сегодня / завтра из настроек)
   let base = new Date();
@@ -461,9 +486,14 @@ function setTheme(theme) {
 // ============ ОБОИ ============
 // Обои хранятся в IndexedDB (лимит сотни МБ), чтобы не упираться в 5 МБ localStorage.
 // Параллельно изображение пережимается canvas'ом до 1920×1080 / JPEG q=0.82.
+// Видео-обои хранятся в том же объектном хранилище под отдельным ключом в виде Blob
+// (dataURL для видео был бы в 1.5× больше и блокировал бы event-loop при сериализации).
 const WP_DB_NAME = "tu_wallpaper_db";
 const WP_STORE = "wallpapers";
 const WP_KEY = "current";
+const WP_VIDEO_KEY = "current_video";
+const VIDEO_WALLPAPER_MAX_BYTES = 50 * 1024 * 1024; // 50 МБ
+let _videoWallpaperObjectUrl = null;
 
 function openWallpaperDB() {
   return new Promise((resolve, reject) => {
@@ -538,6 +568,11 @@ async function loadWallpaper() {
   const src = await readWallpaperFromDB();
   if (src) applyWallpaperSrc(src);
   else clearWallpaperUI();
+
+  // Видео-обои — отдельный ключ в том же хранилище.
+  const videoBlob = await readVideoWallpaperFromDB();
+  if (videoBlob) applyVideoWallpaperBlob(videoBlob);
+  else clearVideoWallpaperUI();
 }
 
 function applyWallpaperSrc(src) {
@@ -574,6 +609,8 @@ async function onWallpaperFile(e) {
   }
   try {
     const dataUrl = await compressImage(f);
+    // Обои и видео-обои взаимоисключающие: при выборе картинки снимаем видео.
+    await clearVideoWallpaper();
     applyWallpaperSrc(dataUrl);
     const ok = await saveWallpaperToDB(dataUrl);
     if (!ok) alert("Не удалось сохранить обои — обои применены только до перезагрузки.");
@@ -582,6 +619,195 @@ async function onWallpaperFile(e) {
     alert("Не удалось прочитать изображение.");
   }
 }
+
+// ============ ВИДЕО-ОБОИ ============
+async function saveVideoWallpaperToDB(blob) {
+  try {
+    const db = await openWallpaperDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(WP_STORE, "readwrite");
+      tx.objectStore(WP_STORE).put(blob, WP_VIDEO_KEY);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+    return true;
+  } catch (e) { debug("IndexedDB save video wallpaper failed:", e); return false; }
+}
+async function readVideoWallpaperFromDB() {
+  try {
+    const db = await openWallpaperDB();
+    return await new Promise((res, rej) => {
+      const tx = db.transaction(WP_STORE, "readonly");
+      const r = tx.objectStore(WP_STORE).get(WP_VIDEO_KEY);
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => rej(r.error);
+    });
+  } catch (e) { debug("IndexedDB read video wallpaper failed:", e); return null; }
+}
+async function deleteVideoWallpaperFromDB() {
+  try {
+    const db = await openWallpaperDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(WP_STORE, "readwrite");
+      tx.objectStore(WP_STORE).delete(WP_VIDEO_KEY);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  } catch (e) { debug(e); }
+}
+
+function ensureVideoWallpaperElement() {
+  let v = document.getElementById("wallpaperVideo");
+  if (v) return v;
+  v = document.createElement("video");
+  v.id = "wallpaperVideo";
+  v.muted = true;
+  v.defaultMuted = true;
+  v.loop = true;
+  v.autoplay = true;
+  v.playsInline = true;
+  v.setAttribute("playsinline", "");
+  v.setAttribute("webkit-playsinline", "");
+  v.setAttribute("muted", "");
+  v.setAttribute("aria-hidden", "true");
+  v.preload = "auto";
+  v.disablePictureInPicture = true;
+  v.controls = false;
+  // Вставляем как первый ребёнок body, чтобы он был позади всего интерфейса
+  // (z-index: -1 в CSS относит его ещё ниже относительно остального контента).
+  document.body.insertBefore(v, document.body.firstChild);
+  return v;
+}
+
+function applyVideoWallpaperBlob(blob) {
+  const v = ensureVideoWallpaperElement();
+  // Освобождаем предыдущий ObjectURL (иначе утечка памяти при повторной загрузке).
+  if (_videoWallpaperObjectUrl) {
+    try { URL.revokeObjectURL(_videoWallpaperObjectUrl); } catch (e) { /* ignore */ }
+  }
+  _videoWallpaperObjectUrl = URL.createObjectURL(blob);
+  v.src = _videoWallpaperObjectUrl;
+
+  const paused = safeGetLS(STORAGE_KEYS.VIDEO_WALLPAPER_PAUSED) === "1";
+  const playPromise = paused ? Promise.resolve() : v.play();
+  if (playPromise && typeof playPromise.catch === "function") {
+    playPromise.catch(err => debug("video wallpaper autoplay rejected:", err));
+  }
+  if (paused) v.pause();
+
+  document.body.classList.add("has-video-wallpaper");
+
+  // Превью в настройках
+  const prev = document.getElementById("videoWallpaperPreview");
+  if (prev) {
+    prev.innerHTML = "";
+    const pv = document.createElement("video");
+    pv.src = _videoWallpaperObjectUrl;
+    pv.muted = true; pv.loop = true; pv.autoplay = true; pv.playsInline = true;
+    pv.setAttribute("playsinline", "");
+    pv.setAttribute("muted", "");
+    pv.preload = "metadata";
+    prev.appendChild(pv);
+    pv.play?.().catch(() => { /* превью тоже может не запуститься до user gesture */ });
+  }
+
+  const pauseBtn = document.getElementById("videoWallpaperPauseBtn");
+  if (pauseBtn) {
+    pauseBtn.style.display = "";
+    pauseBtn.textContent = paused ? "Играть" : "Пауза";
+    pauseBtn.setAttribute("aria-pressed", paused ? "true" : "false");
+  }
+}
+
+async function clearVideoWallpaper() {
+  const v = document.getElementById("wallpaperVideo");
+  if (v) {
+    try { v.pause(); } catch (e) { /* ignore */ }
+    v.removeAttribute("src");
+    v.load();
+    v.remove();
+  }
+  if (_videoWallpaperObjectUrl) {
+    try { URL.revokeObjectURL(_videoWallpaperObjectUrl); } catch (e) { /* ignore */ }
+    _videoWallpaperObjectUrl = null;
+  }
+  document.body.classList.remove("has-video-wallpaper");
+  await deleteVideoWallpaperFromDB();
+  try { localStorage.removeItem(STORAGE_KEYS.VIDEO_WALLPAPER_PAUSED); } catch (e) { debug(e); }
+  clearVideoWallpaperUI();
+}
+
+function clearVideoWallpaperUI() {
+  const prev = document.getElementById("videoWallpaperPreview");
+  if (prev) {
+    // Явно останавливаем превью-видео и снимаем src до удаления — чтобы
+    // браузер сразу отпустил декодер, не дожидаясь GC.
+    prev.querySelectorAll("video").forEach(v => {
+      try { v.pause(); } catch (e) { /* ignore */ }
+      try { v.removeAttribute("src"); v.load(); } catch (e) { /* ignore */ }
+    });
+    prev.innerHTML = "";
+  }
+  const file = document.getElementById("videoWallpaperFile");
+  if (file) file.value = "";
+  const pauseBtn = document.getElementById("videoWallpaperPauseBtn");
+  if (pauseBtn) {
+    pauseBtn.style.display = "none";
+    pauseBtn.textContent = "Пауза";
+    pauseBtn.setAttribute("aria-pressed", "false");
+  }
+}
+
+async function onVideoWallpaperFile(e) {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  if (!/^video\//.test(f.type || "")) {
+    alert("Выберите видеофайл (mp4, webm или другой video/*).");
+    e.target.value = "";
+    return;
+  }
+  if (f.size > VIDEO_WALLPAPER_MAX_BYTES) {
+    alert("Видео слишком большое (максимум 50 МБ). Сожмите файл или обрежьте длительность.");
+    e.target.value = "";
+    return;
+  }
+  try {
+    // Обои и видео-обои взаимоисключающие: при выборе видео снимаем картинку.
+    await clearWallpaper();
+    applyVideoWallpaperBlob(f);
+    const ok = await saveVideoWallpaperToDB(f);
+    if (!ok) alert("Не удалось сохранить видео-обои — применены только до перезагрузки.");
+  } catch (err) {
+    debug(err);
+    alert("Не удалось прочитать видео.");
+  }
+}
+
+function toggleVideoWallpaperPause() {
+  const v = document.getElementById("wallpaperVideo");
+  if (!v) return;
+  const btn = document.getElementById("videoWallpaperPauseBtn");
+  if (v.paused) {
+    const p = v.play();
+    if (p && typeof p.catch === "function") p.catch(err => debug("resume video wallpaper failed:", err));
+    try { localStorage.removeItem(STORAGE_KEYS.VIDEO_WALLPAPER_PAUSED); } catch (e) { debug(e); }
+    if (btn) { btn.textContent = "Пауза"; btn.setAttribute("aria-pressed", "false"); }
+  } else {
+    v.pause();
+    try { localStorage.setItem(STORAGE_KEYS.VIDEO_WALLPAPER_PAUSED, "1"); } catch (e) { debug(e); }
+    if (btn) { btn.textContent = "Играть"; btn.setAttribute("aria-pressed", "true"); }
+  }
+}
+
+// Экономим батарею: ставим видео-обои на паузу, когда вкладка не активна.
+document.addEventListener("visibilitychange", () => {
+  const v = document.getElementById("wallpaperVideo");
+  if (!v) return;
+  const userPaused = safeGetLS(STORAGE_KEYS.VIDEO_WALLPAPER_PAUSED) === "1";
+  if (document.hidden) {
+    try { v.pause(); } catch (e) { /* ignore */ }
+  } else if (!userPaused) {
+    v.play?.().catch(err => debug("resume video on visible failed:", err));
+  }
+});
 
 // ============ СИЛА СТЕКЛА ============
 function getGlassStrength() {
@@ -743,21 +969,25 @@ function generateClassOptions() {
   };
   rebuild(settingsSelect);
   rebuild(adminSelect);
-  
-  // Восстановить сохранённые настройки
-  if (state.student.class) {
+
+  // Восстановить сохранённые настройки. onClassChange() СИНХРОННО пересобирает
+  // вложенные селекты math-group и profile, поэтому можно сразу выставить value
+  // — без setTimeout(..., 0). Раньше порядок операций был не явный, работало «случайно».
+  if (state.student.class && settingsSelect) {
     settingsSelect.value = state.student.class;
     onClassChange();
-    setTimeout(() => {
-      document.getElementById("settingsMathGroup").value = state.student.group;
-      document.getElementById("settingsProfile").value = state.student.profile;
-      document.getElementById("settingsDayView").value = state.student.dayView;
-    }, 0);
+    const g = document.getElementById("settingsMathGroup");
+    const p = document.getElementById("settingsProfile");
+    const dv = document.getElementById("settingsDayView");
+    if (g) g.value = state.student.group || "";
+    if (p) p.value = state.student.profile || "";
+    if (dv) dv.value = state.student.dayView || "today";
   }
 }
 
 function getGradeFromClass(className) {
-  return parseInt(className.match(/\d+/)[0]);
+  const m = String(className || "").match(/\d+/);
+  return m ? parseInt(m[0], 10) : 0;
 }
 
 function getMathGroupCountForClass(className) {
@@ -767,33 +997,38 @@ function getMathGroupCountForClass(className) {
   return grade === 9 ? 3 : 2;
 }
 
+// Сборка <option> за один проход: быстрее, чем innerHTML += в цикле
+// (каждый += переразбирает HTML заново — O(n²)).
+function buildOptionsHtml(items, labelPrefix) {
+  return items
+    .map(v => `<option value="${escapeHtml(String(v))}">${escapeHtml(labelPrefix ? labelPrefix + v : String(v))}</option>`)
+    .join("");
+}
+
 function onClassChange() {
   const className = document.getElementById("settingsClass").value;
   const grade = getGradeFromClass(className);
   const mathGroupSelect = document.getElementById("settingsMathGroup");
   const profileSelect = document.getElementById("settingsProfile");
-  
+
   // Группы математики
-  mathGroupSelect.innerHTML = '<option value="">Без группы</option>';
   if (grade >= 7 && grade <= 11) {
     mathGroupSelect.disabled = false;
     const groups = grade === 9 ? 3 : 2;
-    for (let i = 1; i <= groups; i++) {
-      mathGroupSelect.innerHTML += `<option value="${i}">Группа ${i}</option>`;
-    }
+    const range = Array.from({ length: groups }, (_, i) => i + 1);
+    mathGroupSelect.innerHTML = '<option value="">Без группы</option>' + buildOptionsHtml(range, "Группа ");
   } else {
     mathGroupSelect.disabled = true;
+    mathGroupSelect.innerHTML = '<option value="">Без группы</option>';
   }
-  
+
   // Профили
-  profileSelect.innerHTML = '<option value="">Без профиля</option>';
   if (grade >= 9 && grade <= 11) {
     profileSelect.disabled = false;
-    state.data.profiles.forEach(p => {
-      profileSelect.innerHTML += `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`;
-    });
+    profileSelect.innerHTML = '<option value="">Без профиля</option>' + buildOptionsHtml(state.data.profiles);
   } else {
     profileSelect.disabled = true;
+    profileSelect.innerHTML = '<option value="">Без профиля</option>';
   }
 }
 
@@ -1144,32 +1379,91 @@ function saveGrades() {
 }
 
 // ============ АДМИНИСТРАТОР ============
+// Запоминаем, какой элемент держал фокус до открытия модалки,
+// чтобы вернуть его обратно при закрытии (стандарт доступности).
+let _modalPreviousFocus = null;
 function showAdminLogin() {
-  document.getElementById("adminLoginModal").classList.add("active");
+  const modal = document.getElementById("adminLoginModal");
+  modal.classList.add("active");
+  modal.setAttribute("aria-hidden", "false");
+  _modalPreviousFocus = document.activeElement;
+  // Даём рендеру времени применить .active (display: flex) перед .focus().
+  requestAnimationFrame(() => {
+    document.getElementById("adminLoginInput")?.focus();
+  });
 }
 
 function closeAdminLogin() {
-  document.getElementById("adminLoginModal").classList.remove("active");
+  const modal = document.getElementById("adminLoginModal");
+  modal.classList.remove("active");
+  modal.setAttribute("aria-hidden", "true");
   document.getElementById("adminLoginError").textContent = "";
+  // Возврат фокуса на кнопку, открывшую модалку.
+  if (_modalPreviousFocus && typeof _modalPreviousFocus.focus === "function") {
+    _modalPreviousFocus.focus();
+  }
+  _modalPreviousFocus = null;
 }
 
+// Esc закрывает модалку; Tab удерживается внутри (фокус-трап).
+// Enter в любом инпуте модалки — сабмит (как в нативной форме).
+document.addEventListener("keydown", (e) => {
+  const modal = document.getElementById("adminLoginModal");
+  if (!modal || !modal.classList.contains("active")) return;
+
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closeAdminLogin();
+    return;
+  }
+  if (e.key === "Enter" && modal.contains(e.target) && e.target.tagName === "INPUT") {
+    e.preventDefault();
+    loginAdmin();
+    return;
+  }
+  if (e.key === "Tab") {
+    const focusables = modal.querySelectorAll(
+      "input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    );
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+});
+// Клик по полупрозрачной подложке — закрыть модалку (нативное поведение).
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("adminLoginModal");
+  if (!modal || !modal.classList.contains("active")) return;
+  if (e.target === modal) closeAdminLogin();
+});
+
+let _loginInFlight = false;
 async function loginAdmin() {
+  if (_loginInFlight) return;
   const email = document.getElementById("adminLoginInput").value.trim();
   const password = document.getElementById("adminPasswordInput").value;
+  const errEl = document.getElementById("adminLoginError");
+  const btn = document.getElementById("adminLoginSubmitBtn");
 
   if (!email || !password) {
-    document.getElementById("adminLoginError").textContent = "Введите email и пароль";
+    errEl.textContent = "Введите email и пароль";
     return;
   }
 
+  _loginInFlight = true;
+  if (btn) { btn.disabled = true; btn.dataset.prevText = btn.textContent; btn.textContent = "Входим…"; }
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error || !data.session) {
-      document.getElementById("adminLoginError").textContent = "❌ Неверный email или пароль";
+      errEl.textContent = "❌ Неверный email или пароль";
       return;
     }
 
@@ -1180,8 +1474,11 @@ async function loginAdmin() {
     showAdminNav();
     showScreen("admin");
   } catch (err) {
-    document.getElementById("adminLoginError").textContent = "❌ Ошибка входа. Попробуйте позже.";
+    errEl.textContent = "❌ Ошибка входа. Попробуйте позже.";
     debug("Supabase login error:", err);
+  } finally {
+    _loginInFlight = false;
+    if (btn) { btn.disabled = false; if (btn.dataset.prevText) { btn.textContent = btn.dataset.prevText; delete btn.dataset.prevText; } }
   }
 }
 
@@ -1280,29 +1577,25 @@ function initAdminPanel() {
 function onAdminClassChange() {
   const className = document.getElementById("adminClassSelect").value;
   const grade = className ? getGradeFromClass(className) : 0;
-  
-  // Группы математики
+
   const mathSelect = document.getElementById("adminMathGroupSelect");
-  mathSelect.innerHTML = '<option value="">Без группы</option>';
   if (grade >= 7 && grade <= 11) {
     const groups = grade === 9 ? 3 : 2;
-    for (let i = 1; i <= groups; i++) {
-      mathSelect.innerHTML += `<option value="${i}">Группа ${i}</option>`;
-    }
+    const range = Array.from({ length: groups }, (_, i) => i + 1);
+    mathSelect.innerHTML = '<option value="">Без группы</option>' + buildOptionsHtml(range, "Группа ");
+  } else {
+    mathSelect.innerHTML = '<option value="">Без группы</option>';
   }
-  
-  // Профили
+
   const profileSelect = document.getElementById("adminProfileSelect");
-  profileSelect.innerHTML = '<option value="">Без профиля</option>';
   if (grade >= 9 && grade <= 11) {
-    state.data.profiles.forEach(p => {
-      profileSelect.innerHTML += `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`;
-    });
+    profileSelect.innerHTML = '<option value="">Без профиля</option>' + buildOptionsHtml(state.data.profiles);
+  } else {
+    profileSelect.innerHTML = '<option value="">Без профиля</option>';
   }
-  
-  // Проверка домашнего обучения
+
   document.getElementById("remoteLearningCheck").checked = !!state.data.remoteClasses[className];
-  
+
   renderAdminLessons();
 }
 
@@ -1339,12 +1632,18 @@ function renderAdminLessons() {
   const isSaturday = day === 6;
   
   const key = `${className}|${group}|${profile}|${day}`;
-  let timetable = state.data.timetables[key] || { lessons: [] };
-  
+  const existing = state.data.timetables[key];
+  // Работаем с ЛОКАЛЬНОЙ копией для отрисовки. В state.data.timetables пишем
+  // только после явного Save — иначе пустые «болванки» протекают в кэш и
+  // создают фальшивые записи «расписание есть, но пустое».
+  const timetable = existing
+    ? { ...existing, lessons: (existing.lessons || []).slice() }
+    : { lessons: [] };
+
   document.getElementById("bigBreakLessonCheck").checked = timetable.hasBigBreakLesson || false;
   document.getElementById("ninthLessonCheck").checked = timetable.hasNinthLesson || false;
   document.getElementById("ninthLessonTimeSettings").classList.toggle("hidden", !timetable.hasNinthLesson);
-  
+
   if (timetable.ninthTime) {
     const [startH, startM] = timetable.ninthTime.start.split(":");
     const [endH, endM] = timetable.ninthTime.end.split(":");
@@ -1353,18 +1652,12 @@ function renderAdminLessons() {
     document.getElementById("ninthEndH").value = endH;
     document.getElementById("ninthEndM").value = endM;
   }
-  
+
   if (timetable.lessons.length === 0) {
     const timeConfig = isSaturday ? DEFAULT_TIMES.saturday : DEFAULT_TIMES.weekday;
     for (let i = 1; i <= 8; i++) {
-      timetable.lessons.push({
-        number: i,
-        subject: "",
-        cabinet: "",
-        time: timeConfig[i]
-      });
+      timetable.lessons.push({ number: i, subject: "", cabinet: "", time: timeConfig[i] });
     }
-    state.data.timetables[key] = timetable;
   }
   
   container.innerHTML = timetable.lessons.map((lesson, idx) => `
@@ -1387,11 +1680,12 @@ function renderAdminLessons() {
 }
 
 function generateCabinetOptions(selected) {
-  let html = "";
+  const sel = String(selected);
+  const parts = new Array(23);
   for (let i = 1; i <= 23; i++) {
-    html += `<option value="${i}" ${String(selected) === String(i) ? "selected" : ""}>${i}</option>`;
+    parts[i - 1] = `<option value="${i}"${sel === String(i) ? " selected" : ""}>${i}</option>`;
   }
-  return html;
+  return parts.join("");
 }
 
 function addNewLesson() {
@@ -1438,16 +1732,29 @@ function toggleNinthLesson() {
   document.getElementById("ninthLessonTimeSettings").classList.toggle("hidden", !checked);
 }
 
-function toggleRemoteLearning() {
+async function toggleRemoteLearning() {
+  const checkbox = document.getElementById("remoteLearningCheck");
   const className = document.getElementById("adminClassSelect").value;
-  if (document.getElementById("remoteLearningCheck").checked) {
-    state.data.remoteClasses[className] = true;
-    localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(state.data.remoteClasses));
-    saveRemoteClassToSupabase(className);
-  } else {
-    delete state.data.remoteClasses[className];
-    localStorage.setItem(STORAGE_KEYS.REMOTE, JSON.stringify(state.data.remoteClasses));
-    removeRemoteClassFromSupabase(className);
+  if (!className) { checkbox.checked = !checkbox.checked; return; }
+
+  // Оптимистично меняем локальный state и localStorage, затем идём в облако.
+  // Если сеть упала — откатываем всё, в т.ч. галочку в UI, чтобы у админа
+  // не осталось ложного «всё ок».
+  const prev = { ...state.data.remoteClasses };
+  const nowOn = checkbox.checked;
+  if (nowOn) state.data.remoteClasses[className] = true;
+  else delete state.data.remoteClasses[className];
+  safeSetLS(STORAGE_KEYS.REMOTE, JSON.stringify(state.data.remoteClasses));
+
+  const ok = nowOn
+    ? await saveRemoteClassToSupabase(className)
+    : await removeRemoteClassFromSupabase(className);
+
+  if (!ok) {
+    state.data.remoteClasses = prev;
+    safeSetLS(STORAGE_KEYS.REMOTE, JSON.stringify(state.data.remoteClasses));
+    checkbox.checked = !nowOn;
+    alert("Не удалось синхронизировать с облаком. Попробуйте позже.");
   }
 }
 
@@ -1463,10 +1770,36 @@ function renderProfilesList() {
   `).join("");
 }
 
-async function addProfile() {
+// Блокируем кнопку на время сетевого запроса, чтобы двойной клик не отправил
+// два одинаковых инсерта. WeakMap хранит состояние «в процессе» для любых
+// асинхронных кнопок админки.
+const _busyButtons = new WeakSet();
+function withButtonBusy(btnId, fn) {
+  return async function (...args) {
+    const btn = document.getElementById(btnId);
+    if (btn && _busyButtons.has(btn)) return;
+    if (btn) { _busyButtons.add(btn); btn.disabled = true; btn.dataset.prevText = btn.textContent; btn.textContent = "…"; }
+    try { return await fn(...args); }
+    finally {
+      if (btn) { _busyButtons.delete(btn); btn.disabled = false; if (btn.dataset.prevText) { btn.textContent = btn.dataset.prevText; delete btn.dataset.prevText; } }
+    }
+  };
+}
+
+const addProfile = withButtonBusy("addProfileBtn", async function addProfileImpl() {
   const input = document.getElementById("newProfileName");
   const name = input.value.trim();
   if (!name) return;
+  // Ключи расписаний — "class|group|profile|day". Символ | ломает разбор,
+  // поэтому запрещаем его в названии профиля. Длину тоже ограничиваем.
+  if (/\|/.test(name)) {
+    alert('В названии профиля нельзя использовать символ "|".');
+    return;
+  }
+  if (name.length > 40) {
+    alert("Слишком длинное название профиля (до 40 символов).");
+    return;
+  }
   if (state.data.profiles.includes(name)) {
     alert("Такой профиль уже существует");
     return;
@@ -1482,20 +1815,26 @@ async function addProfile() {
   input.value = "";
   renderProfilesList();
   onAdminClassChange();
-}
+});
 
 async function removeProfile(idx) {
   const profileName = state.data.profiles[idx];
   if (!confirm(`Удалить профиль "${profileName}"?`)) return;
+  // Оптимистично снимаем из UI: долгие сетевые запросы не должны замораживать
+  // интерфейс. При ошибке возвращаем профиль на место.
+  const prev = state.data.profiles.slice();
+  state.data.profiles.splice(idx, 1);
+  renderProfilesList();
+  onAdminClassChange();
   const ok = await deleteProfileFromSupabase(profileName);
   if (!ok) {
+    state.data.profiles = prev;
+    renderProfilesList();
+    onAdminClassChange();
     alert("Не удалось удалить профиль в облаке. Попробуйте позже.");
     return;
   }
-  state.data.profiles.splice(idx, 1);
   safeSetLS(STORAGE_KEYS.PROFILES, JSON.stringify(state.data.profiles));
-  renderProfilesList();
-  onAdminClassChange();
 }
 
 async function saveAdminTimetable() {
@@ -1571,10 +1910,14 @@ async function loadDataFromSupabase() {
     withTimeout(supabase.from('remote_classes').select('class_name'), T, 'remote_classes')
   ]);
 
-  // Расписание
+  // Расписание: ЗАМЕНЯЕМ полностью, а не мерджим.
+  // Если админ удалил запись в облаке, старая из localStorage-кэша должна
+  // уйти вместе с ней — иначе в интерфейсе останутся «призраки».
   const tt = results[0];
   if (tt.status === "fulfilled" && !tt.value.error && tt.value.data) {
-    tt.value.data.forEach(item => { state.data.timetables[item.key] = item.data; });
+    const fresh = {};
+    tt.value.data.forEach(item => { fresh[item.key] = item.data; });
+    state.data.timetables = fresh;
     safeSetLS(STORAGE_KEYS.TIMETABLES, JSON.stringify(state.data.timetables));
     debug("✅ Расписание загружено из Supabase");
   } else {
@@ -1587,7 +1930,6 @@ async function loadDataFromSupabase() {
   const pr = results[1];
   if (pr.status === "fulfilled" && !pr.value.error && pr.value.data) {
     state.data.profiles = pr.value.data.map(p => p.name);
-    PROFILES = state.data.profiles;
     safeSetLS(STORAGE_KEYS.PROFILES, JSON.stringify(state.data.profiles));
     debug("✅ Профили загружены из Supabase");
   } else {
@@ -1595,7 +1937,6 @@ async function loadDataFromSupabase() {
     const cached = safeGetLS(STORAGE_KEYS.PROFILES);
     if (cached) {
       state.data.profiles = safeJSONParse(cached, []);
-      PROFILES = state.data.profiles;
     }
   }
 
@@ -1614,20 +1955,8 @@ async function loadDataFromSupabase() {
   }
 
   subscribeToSupabaseChanges();
-  
-  // Студенческие данные из локального хранилища (они не хранятся в облаке)
-  const s = safeJSONParse(safeGetLS(STORAGE_KEYS.STUDENT), null);
-  if (s) {
-    state.student.class = s.class;
-    state.student.group = s.group;
-    state.student.profile = s.profile;
-    state.student.dayView = s.dayView || "today";
-    document.getElementById("calcNavItem").style.display = "flex";
-    document.getElementById("settingsNavItem").style.display = "flex";
-    document.getElementById("calcBottomItem").style.display = "flex";
-    document.getElementById("settingsBottomItem").style.display = "flex";
-  }
-  state.data.grades = safeJSONParse(safeGetLS(STORAGE_KEYS.GRADES), []) || [];
+  // Студенческие данные и оценки — локальные, читаются в loadDataFromLocalStorage()
+  // до первого рендера. Дублировать их здесь не нужно.
 }
 
 function loadDataFromLocalStorage() {
@@ -1644,14 +1973,13 @@ function loadDataFromLocalStorage() {
   }
   state.data.grades = safeJSONParse(safeGetLS(STORAGE_KEYS.GRADES), []) || [];
   state.data.timetables = safeJSONParse(safeGetLS(STORAGE_KEYS.TIMETABLES), {}) || {};
+  // Если админ явно очистил профили — сохраняем пустой массив (не подменяем
+  // дефолтами). Дефолты уже заданы в инициализации state.data.profiles и
+  // сработают только при полном отсутствии ключа в localStorage.
   const profiles = safeJSONParse(safeGetLS(STORAGE_KEYS.PROFILES), null);
-  if (Array.isArray(profiles)) {
-    state.data.profiles = profiles;
-    PROFILES = state.data.profiles;
-  }
+  if (Array.isArray(profiles)) state.data.profiles = profiles;
   state.data.remoteClasses = safeJSONParse(safeGetLS(STORAGE_KEYS.REMOTE), {}) || {};
 }
-
 async function saveToSupabase(key, data) {
   if (!supabase) { debug("Supabase не инициализирован"); return false; }
   
@@ -1786,7 +2114,6 @@ function subscribeToSupabaseChanges() {
       const { data } = await supabase.from('profiles').select('*');
       if (data) {
         state.data.profiles = data.map(p => p.name);
-        PROFILES = state.data.profiles;
         safeSetLS(STORAGE_KEYS.PROFILES, JSON.stringify(state.data.profiles));
         renderProfilesList?.();
       }
@@ -1808,25 +2135,8 @@ function loadData() {
   loadDataFromLocalStorage();
 }
 
-function installBrowserProtection() {
-  document.addEventListener("contextmenu", event => event.preventDefault());
-  document.addEventListener("keydown", event => {
-    const key = event.key.toUpperCase();
-    if (
-      key === "F12" ||
-      (event.ctrlKey && event.shiftKey && ["I", "J", "C"].includes(key)) ||
-      (event.ctrlKey && key === "U") ||
-      (event.ctrlKey && key === "S") ||
-      (event.ctrlKey && key === "F")
-    ) {
-      event.preventDefault();
-      event.stopPropagation();
-      return false;
-    }
-  });
-  document.body.addEventListener("mousedown", event => {
-    if (event.button === 2) event.preventDefault();
-  });
-}
-
-installBrowserProtection();
+// Блокировка F12/ПКМ/Ctrl+U/S/F намеренно удалена:
+// это не даёт никакой защиты (DevTools открываются через меню или CDP,
+// исходники и так раздаются HTTP-сервером), но ломает реальные функции —
+// поиск по странице, сохранение, орфографию в инпутах. Безопасность должна
+// жить на стороне Supabase (RLS-политики на таблицы).
